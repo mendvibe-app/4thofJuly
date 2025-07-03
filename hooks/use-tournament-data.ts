@@ -23,11 +23,13 @@ export function useTournamentData() {
     // Subscribe to teams changes
     const teamsSubscription = supabase
       .channel("teams-changes")
-      .on("postgres_changes", { event: "*", schema: "public", table: "teams" }, () => {
-        console.log("🔄 Teams updated - reloading...")
+      .on("postgres_changes", { event: "*", schema: "public", table: "teams" }, (payload) => {
+        console.log("🔄 Teams updated - reloading...", payload)
         loadTeams()
       })
-      .subscribe()
+      .subscribe((status) => {
+        console.log("📡 Teams subscription status:", status)
+      })
 
     // Subscribe to matches changes
     const matchesSubscription = supabase
@@ -189,7 +191,7 @@ export function useTournamentData() {
         .from("tournament_settings")
         .select(`
           *,
-          bye_team:teams(*)
+          bye_team:teams!bye_team_id(*)
         `)
         .single()
 
@@ -217,10 +219,10 @@ export function useTournamentData() {
           pointsFor: data.bye_team.points_for,
           pointsAgainst: data.bye_team.points_against,
         })
+        console.log(`✅ Bye team loaded: ${data.bye_team.name}`)
       } else {
         setByeTeam(null)
       }
-      console.log(`✅ Tournament phase: ${data.current_phase}`)
     } catch (error) {
       console.error("❌ Error loading tournament settings:", error)
       setCurrentPhase("registration")
@@ -245,6 +247,10 @@ export function useTournamentData() {
       throw error
     }
     console.log("✅ Team added successfully!")
+    
+    // Manually reload teams to update UI
+    console.log("🔄 Manually reloading teams for UI update...")
+    await loadTeams()
   }
 
   const updateTeam = async (teamId: number, updates: Partial<Team>) => {
@@ -267,6 +273,10 @@ export function useTournamentData() {
       throw error
     }
     console.log("✅ Team updated successfully!")
+    
+    // Manually reload teams to update UI
+    console.log("🔄 Manually reloading teams for UI update...")
+    await loadTeams()
   }
 
   const deleteTeam = async (teamId: number) => {
@@ -293,6 +303,10 @@ export function useTournamentData() {
       }
 
       console.log("✅ Team deleted successfully!")
+      
+      // Manually reload teams to update UI
+      console.log("🔄 Manually reloading teams for UI update...")
+      await loadTeams()
     } catch (error) {
       console.error("❌ Error in deleteTeam:", error)
       throw error
@@ -315,10 +329,34 @@ export function useTournamentData() {
       throw error
     }
     console.log("✅ Match updated successfully!")
+    
+    // Manually reload matches to update UI
+    console.log("🔄 Manually reloading matches for UI update...")
+    await loadMatches()
   }
 
   const createMatches = async (matches: Omit<Match, "id">[]) => {
     console.log("🏆 Creating matches:", matches.length)
+    
+    // Validate input data
+    if (!matches || matches.length === 0) {
+      console.error("❌ No matches provided to create")
+      throw new Error("No matches provided to create")
+    }
+    
+    // Validate each match
+    for (let i = 0; i < matches.length; i++) {
+      const match = matches[i]
+      if (!match.team1 || !match.team2) {
+        console.error(`❌ Invalid match ${i}: Missing team data`, match)
+        throw new Error(`Invalid match ${i}: Missing team data`)
+      }
+      if (!match.team1.id || !match.team2.id) {
+        console.error(`❌ Invalid match ${i}: Missing team IDs`, match)
+        throw new Error(`Invalid match ${i}: Missing team IDs`)
+      }
+    }
+    
     const matchData = matches.map((match) => ({
       team1_id: match.team1.id,
       team2_id: match.team2.id,
@@ -329,13 +367,20 @@ export function useTournamentData() {
       round: match.round,
     }))
 
-    const { error } = await supabase.from("matches").insert(matchData)
+    console.log("📝 Match data to insert:", matchData)
+    
+    const { error, data } = await supabase.from("matches").insert(matchData).select()
 
     if (error) {
       console.error("❌ Error creating matches:", error)
+      console.error("❌ Failed data:", matchData)
       throw error
     }
-    console.log("✅ Matches created successfully!")
+    console.log("✅ Matches created successfully!", data)
+    
+    // Manually reload matches to update UI
+    console.log("🔄 Manually reloading matches for UI update...")
+    await loadMatches()
   }
 
   const updateTournamentPhase = async (phase: TournamentPhase) => {
@@ -368,6 +413,10 @@ export function useTournamentData() {
       }
     }
     console.log("✅ Tournament phase updated successfully!")
+    
+    // Manually reload tournament settings to update UI
+    console.log("🔄 Manually reloading tournament settings for UI update...")
+    await loadTournamentSettings()
   }
 
   const setByeTeamId = async (teamId: number | null) => {
@@ -397,21 +446,17 @@ export function useTournamentData() {
       }
     }
     console.log("✅ Bye team set successfully!")
+    
+    // Manually reload tournament settings to update UI
+    console.log("🔄 Manually reloading tournament settings for UI update...")
+    await loadTournamentSettings()
   }
 
   const resetTournament = async () => {
     console.log("🔄 Resetting tournament...")
 
     try {
-      // Delete all matches first (due to foreign key constraints)
-      const { error: matchError } = await supabase.from("matches").delete().gte("id", 0)
-      if (matchError) throw matchError
-
-      // Delete all teams
-      const { error: teamError } = await supabase.from("teams").delete().gte("id", 0)
-      if (teamError) throw teamError
-
-      // Reset tournament settings
+      // Step 1: Reset tournament settings first (clear bye_team_id to remove foreign key reference)
       const { data: existing } = await supabase.from("tournament_settings").select("id").single()
 
       if (existing) {
@@ -419,14 +464,43 @@ export function useTournamentData() {
           .from("tournament_settings")
           .update({
             current_phase: "registration",
-            bye_team_id: null,
+            bye_team_id: null,  // Clear this BEFORE deleting teams
           })
           .eq("id", existing.id)
 
-        if (settingsError) throw settingsError
+        if (settingsError) {
+          console.error("❌ Error resetting tournament settings:", settingsError)
+          throw settingsError
+        }
+        console.log("✅ Tournament settings reset")
       }
 
+      // Step 2: Delete all matches (due to foreign key constraints with teams)
+      const { error: matchError } = await supabase.from("matches").delete().gte("id", 0)
+      if (matchError) {
+        console.error("❌ Error deleting matches:", matchError)
+        throw matchError
+      }
+      console.log("✅ All matches deleted")
+
+      // Step 3: Now safe to delete all teams (no foreign key references left)
+      const { error: teamError } = await supabase.from("teams").delete().gte("id", 0)
+      if (teamError) {
+        console.error("❌ Error deleting teams:", teamError)
+        throw teamError
+      }
+      console.log("✅ All teams deleted")
+
       console.log("✅ Tournament reset successfully!")
+      
+      // Manually reload all data to update UI
+      console.log("🔄 Manually reloading all data for UI update...")
+      await Promise.all([
+        loadTeams(),
+        loadMatches(), 
+        loadTournamentSettings()
+      ])
+      console.log("✅ All data reloaded after reset!")
     } catch (error) {
       console.error("❌ Error resetting tournament:", error)
       throw error

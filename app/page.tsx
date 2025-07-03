@@ -7,6 +7,7 @@ import { Users, Trophy, DollarSign, Play, Wifi, WifiOff, AlertCircle } from "luc
 import TeamRegistration from "@/components/team-registration"
 import PoolPlay from "@/components/pool-play"
 import KnockoutBracket from "@/components/knockout-bracket"
+import NCAABracket from "@/components/ncaa-bracket"
 import { useTournamentData } from "@/hooks/use-tournament-data"
 
 export default function TournamentApp() {
@@ -58,9 +59,11 @@ export default function TournamentApp() {
         return (
           <KnockoutBracket
             matches={knockoutMatches}
+            poolPlayMatches={poolPlayMatches}
             updateMatch={updateMatch}
             createMatches={createMatches}
             byeTeam={byeTeam}
+            allTeams={teams}
           />
         )
       default:
@@ -121,17 +124,10 @@ export default function TournamentApp() {
       <div className="max-w-4xl mx-auto px-4 py-6">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl sm:text-4xl font-bold mb-2 text-red-600 flex items-center justify-center gap-2">
+          <h1 className="text-3xl sm:text-4xl font-bold mb-2 text-red-600">
             4th of July Invitational
-            {getConnectionIcon()}
           </h1>
-          <p className="text-gray-600 font-medium">{getConnectionText()}</p>
-          <p className="text-sm text-blue-600 mt-1">Real-time scores • Collaborative scoring • Mobile-first</p>
-          {connectionStatus === "error" && (
-            <p className="text-sm text-red-600 mt-2">
-              💡 Make sure you've run the SQL script in Supabase and added environment variables
-            </p>
-          )}
+          <p className="text-gray-600 font-medium">Harbor Way Soccer Tennis Tournament</p>
         </div>
 
         {/* Stats Cards */}
@@ -197,55 +193,7 @@ export default function TournamentApp() {
           </Card>
         </div>
 
-        {/* Connection Status Banner */}
-        <Card
-          className={`border-2 mb-6 ${
-            connectionStatus === "connected"
-              ? "bg-gradient-to-r from-green-50 to-blue-50 border-green-300"
-              : connectionStatus === "error"
-                ? "bg-gradient-to-r from-red-50 to-orange-50 border-red-300"
-                : "bg-gradient-to-r from-yellow-50 to-blue-50 border-yellow-300"
-          }`}
-        >
-          <CardContent className="p-4">
-            <div className="flex items-center justify-center gap-3 text-center">
-              <div className="flex items-center gap-2">
-                <div
-                  className={`w-3 h-3 rounded-full ${
-                    connectionStatus === "connected"
-                      ? "bg-green-500 animate-pulse"
-                      : connectionStatus === "error"
-                        ? "bg-red-500"
-                        : "bg-yellow-500 animate-pulse"
-                  }`}
-                ></div>
-                <span
-                  className={`font-bold ${
-                    connectionStatus === "connected"
-                      ? "text-green-800"
-                      : connectionStatus === "error"
-                        ? "text-red-800"
-                        : "text-yellow-800"
-                  }`}
-                >
-                  {connectionStatus === "connected"
-                    ? "LIVE TOURNAMENT"
-                    : connectionStatus === "error"
-                      ? "CONNECTION ERROR"
-                      : "CONNECTING"}
-                </span>
-              </div>
-              {connectionStatus === "connected" && (
-                <>
-                  <span className="text-gray-600">•</span>
-                  <span className="text-blue-800 font-medium">Anyone can enter scores</span>
-                  <span className="text-gray-600">•</span>
-                  <span className="text-purple-800 font-medium">Updates in real-time</span>
-                </>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+
 
         {/* Navigation */}
         <div className="flex flex-col sm:flex-row gap-3 mb-6">
