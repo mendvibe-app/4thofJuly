@@ -32,8 +32,19 @@ export default function TeamRegistration({
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleAddTeam = async () => {
-    if (!teamName.trim() || !player1.trim() || !player2.trim() || isSubmitting) return
+    console.log("🎯 ADD TEAM DEBUG:", {
+      teamName: teamName.trim(),
+      player1: player1.trim(),
+      player2: player2.trim(),
+      isSubmitting
+    })
+    
+    if (!teamName.trim() || !player1.trim() || !player2.trim() || isSubmitting) {
+      console.log("❌ VALIDATION FAILED - missing fields or already submitting")
+      return
+    }
 
+    console.log("✅ VALIDATION PASSED - attempting to add team")
     setIsSubmitting(true)
     try {
       const newTeam: Omit<Team, "id"> = {
@@ -46,10 +57,12 @@ export default function TeamRegistration({
         pointsAgainst: 0,
       }
 
+      console.log("🚀 CALLING addTeam with:", newTeam)
       await addTeam(newTeam)
+      console.log("✅ ADD TEAM SUCCESS!")
       resetForm()
     } catch (error) {
-      console.error("Error adding team:", error)
+      console.error("❌ ADD TEAM ERROR:", error)
       alert("Failed to add team. Please try again.")
     } finally {
       setIsSubmitting(false)
@@ -75,12 +88,20 @@ export default function TeamRegistration({
   }
 
   const handleDeleteTeam = async (teamId: number) => {
-    if (!confirm("Are you sure you want to delete this team?")) return
+    console.log("🎯 DELETE TEAM DEBUG:", { teamId })
+    
+    if (!confirm("Are you sure you want to delete this team?")) {
+      console.log("❌ DELETE CANCELLED by user")
+      return
+    }
 
+    console.log("✅ DELETE CONFIRMED - attempting to delete team")
     try {
+      console.log("🚀 CALLING deleteTeam with ID:", teamId)
       await deleteTeam(teamId)
+      console.log("✅ DELETE TEAM SUCCESS!")
     } catch (error) {
-      console.error("Error deleting team:", error)
+      console.error("❌ DELETE TEAM ERROR:", error)
       alert("Failed to delete team. Please try again.")
     }
   }
@@ -312,7 +333,7 @@ export default function TeamRegistration({
           <CardTitle className="flex items-center gap-2 text-amber-900">Testing Tools</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
             <Button
               onClick={() => generateRandomTeams(4)}
               variant="outline"
@@ -336,6 +357,14 @@ export default function TeamRegistration({
               className="border-amber-300 text-amber-700 hover:bg-amber-100 h-11 font-medium bg-transparent"
             >
               8 Teams
+            </Button>
+            <Button
+              onClick={() => generateRandomTeams(9)}
+              variant="outline"
+              disabled={isSubmitting}
+              className="border-yellow-400 text-yellow-700 hover:bg-yellow-100 h-11 font-medium bg-transparent font-bold"
+            >
+              9 Teams 👋
             </Button>
             <Button
               onClick={() => generateRandomTeams(12)}

@@ -84,37 +84,181 @@ export default function PoolPlay({
 
     setIsGenerating(true)
     try {
-      const newMatches: Omit<Match, "id">[] = []
-      const totalGames = Math.min(gamesPerTeam, teams.length - 1)
-
-      // Create round-robin style matches
-      for (let i = 0; i < teams.length; i++) {
-        let gamesForTeam = 0
-        for (let j = i + 1; j < teams.length && gamesForTeam < totalGames; j++) {
-          // Check if this matchup already exists
-          const existingMatch = matches.find(
-            (match) =>
-              (match.team1.id === teams[i].id && match.team2.id === teams[j].id) ||
-              (match.team1.id === teams[j].id && match.team2.id === teams[i].id),
-          )
-
-          if (!existingMatch) {
-            newMatches.push({
-              team1: teams[i],
-              team2: teams[j],
-              team1Score: 0,
-              team2Score: 0,
-              completed: false,
-              phase: "pool-play",
-              round: null,
-            })
-            gamesForTeam++
+      const targetGames = Math.min(gamesPerTeam, teams.length - 1)
+      
+      // Track games per team to ensure exactly targetGames for each team
+      const gameCount = new Map<number, number>()
+      teams.forEach(team => gameCount.set(team.id, 0))
+      
+      // Count existing matches for each team
+      matches.forEach(match => {
+        const team1Games = gameCount.get(match.team1.id) || 0
+        const team2Games = gameCount.get(match.team2.id) || 0
+        gameCount.set(match.team1.id, team1Games + 1)
+        gameCount.set(match.team2.id, team2Games + 1)
+      })
+      
+      console.log(`🏓 Generating pool play schedule: ${targetGames} games per team`)
+      console.log(`📊 Current games per team:`, Object.fromEntries(
+        teams.map(t => [t.name, gameCount.get(t.id) || 0])
+      ))
+      
+      // Step 1: Generate all needed matches (without considering schedule order yet)
+      const allNeededMatches: {team1: Team, team2: Team}[] = []
+      const tempGameCount = new Map(gameCount)
+      
+      // Create a shuffled list of teams for variety
+      const shuffledTeams = [...teams].sort(() => Math.random() - 0.5)
+      
+      // Phase 1: Create matches between teams that both need games
+      for (let attempts = 0; attempts < 500; attempts++) {
+        const teamsNeedingGames = shuffledTeams.filter(team => 
+          (tempGameCount.get(team.id) || 0) < targetGames
+        )
+        
+        if (teamsNeedingGames.length === 0) break
+        
+        let matchCreated = false
+        for (let i = 0; i < teamsNeedingGames.length - 1; i++) {
+          const team1 = teamsNeedingGames[i]
+          for (let j = i + 1; j < teamsNeedingGames.length; j++) {
+            const team2 = teamsNeedingGames[j]
+            
+            // Check if these teams have already played
+            const alreadyPlayed = matches.some(match => 
+              (match.team1.id === team1.id && match.team2.id === team2.id) ||
+              (match.team1.id === team2.id && match.team2.id === team1.id)
+            ) || allNeededMatches.some(match => 
+              (match.team1.id === team1.id && match.team2.id === team2.id) ||
+              (match.team1.id === team2.id && match.team2.id === team1.id)
+            )
+            
+            if (!alreadyPlayed) {
+              allNeededMatches.push({team1, team2})
+              tempGameCount.set(team1.id, (tempGameCount.get(team1.id) || 0) + 1)
+              tempGameCount.set(team2.id, (tempGameCount.get(team2.id) || 0) + 1)
+              matchCreated = true
+              break
+            }
           }
+          if (matchCreated) break
+        }
+        if (!matchCreated) break
+      }
+      
+      // Phase 2: Fill remaining games for teams that still need more
+      const teamsStillNeedingGames = teams.filter(team => 
+        (tempGameCount.get(team.id) || 0) < targetGames
+      )
+      
+      for (const team of teamsStillNeedingGames) {
+        const currentGames = tempGameCount.get(team.id) || 0
+        const gamesNeeded = targetGames - currentGames
+        
+        const potentialOpponents = teams.filter(opponent => {
+          if (opponent.id === team.id) return false
+          const alreadyPlayed = matches.some(match => 
+            (match.team1.id === team.id && match.team2.id === opponent.id) ||
+            (match.team1.id === opponent.id && match.team2.id === team.id)
+          ) || allNeededMatches.some(match => 
+            (match.team1.id === team.id && match.team2.id === opponent.id) ||
+            (match.team1.id === opponent.id && match.team2.id === team.id)
+          )
+          return !alreadyPlayed
+        }).sort(() => Math.random() - 0.5)
+        
+        for (let i = 0; i < Math.min(gamesNeeded, potentialOpponents.length); i++) {
+          const opponent = potentialOpponents[i]
+          allNeededMatches.push({team1: team, team2: opponent})
+          tempGameCount.set(team.id, (tempGameCount.get(team.id) || 0) + 1)
+          tempGameCount.set(opponent.id, (tempGameCount.get(opponent.id) || 0) + 1)
         }
       }
-
-      if (newMatches.length > 0) {
-        await createMatches(newMatches)
+      
+      console.log(`📋 Generated ${allNeededMatches.length} total matches. Now creating optimal schedule...`)
+      
+      // Step 2: Create optimal schedule - spread teams out to avoid back-to-back games
+      const scheduledMatches: Omit<Match, "id">[] = []
+      const remainingMatches = [...allNeededMatches]
+      const teamLastPlayedRound = new Map<number, number>() // Track when each team last played
+      
+      let round = 1
+      while (remainingMatches.length > 0) {
+        console.log(`📅 Scheduling round ${round}...`)
+        
+        // Find the best match for this round (teams that haven't played recently)
+        let bestMatch: {team1: Team, team2: Team} | null = null
+        let bestScore = -1
+        let bestIndex = -1
+        
+        for (let i = 0; i < remainingMatches.length; i++) {
+          const match = remainingMatches[i]
+          const team1LastRound = teamLastPlayedRound.get(match.team1.id) || 0
+          const team2LastRound = teamLastPlayedRound.get(match.team2.id) || 0
+          
+          // Score = how many rounds since each team last played (higher is better)
+          const team1Rest = round - team1LastRound
+          const team2Rest = round - team2LastRound
+          const matchScore = team1Rest + team2Rest
+          
+          if (matchScore > bestScore) {
+            bestScore = matchScore
+            bestMatch = match
+            bestIndex = i
+          }
+        }
+        
+        if (bestMatch) {
+          // Schedule this match
+          scheduledMatches.push({
+            team1: bestMatch.team1,
+            team2: bestMatch.team2,
+            team1Score: 0,
+            team2Score: 0,
+            completed: false,
+            phase: "pool-play",
+            round: undefined,
+          })
+          
+          // Update when these teams last played
+          teamLastPlayedRound.set(bestMatch.team1.id, round)
+          teamLastPlayedRound.set(bestMatch.team2.id, round)
+          
+          // Remove this match from remaining matches
+          remainingMatches.splice(bestIndex, 1)
+          
+          console.log(`   Game ${round}: ${bestMatch.team1.name} vs ${bestMatch.team2.name} (rest: ${round - (teamLastPlayedRound.get(bestMatch.team1.id) || 0) + 1}/${round - (teamLastPlayedRound.get(bestMatch.team2.id) || 0) + 1})`)
+          
+          round++
+        } else {
+          // Shouldn't happen, but safety break
+          console.error("❌ Could not find a valid match to schedule")
+          break
+        }
+      }
+      
+      console.log(`🏁 Schedule created! ${scheduledMatches.length} games scheduled.`)
+      console.log(`📊 Final games per team:`, Object.fromEntries(
+        teams.map(t => {
+          const count = scheduledMatches.filter(m => m.team1.id === t.id || m.team2.id === t.id).length + 
+                       matches.filter(m => m.team1.id === t.id || m.team2.id === t.id).length
+          return [t.name, count]
+        })
+      ))
+      
+      // Show schedule preview
+      console.log(`📅 Game Schedule Preview:`)
+      scheduledMatches.slice(0, 10).forEach((match, i) => {
+        console.log(`   Game ${i + 1}: ${match.team1.name} vs ${match.team2.name}`)
+      })
+      if (scheduledMatches.length > 10) {
+        console.log(`   ... and ${scheduledMatches.length - 10} more games`)
+      }
+      
+      if (scheduledMatches.length > 0) {
+        await createMatches(scheduledMatches)
+      } else {
+        console.log(`ℹ️ No new matches needed - all teams already have sufficient games`)
       }
     } catch (error) {
       console.error("Error generating matches:", error)
@@ -127,51 +271,52 @@ export default function PoolPlay({
   const generateKnockoutBracket = async () => {
     const standings = calculateStandings()
     const completedMatches = matches.filter((match) => match.completed)
-
+    
     if (completedMatches.length === 0) {
       alert("Please complete some pool play matches first!")
       return
     }
 
     try {
-      // Determine how many teams advance (minimum 4, maximum 8, or all teams if 8 or fewer)
-      let advancingTeams = Math.min(8, Math.max(4, teams.length))
-
-      // For odd numbers, ensure we have an even number for bracket
-      if (advancingTeams % 2 !== 0 && advancingTeams < teams.length) {
-        advancingTeams += 1
-      }
-
-      // If we have exactly the number of teams as advancing spots, all advance
-      if (teams.length <= 8) {
-        advancingTeams = teams.length
-      }
-
-      console.log(`Teams: ${teams.length}, Advancing: ${advancingTeams}`)
-
-      const topTeams = standings.slice(0, advancingTeams)
-
-      // Handle bye team for odd numbers
-      let byeTeam = null
-      let bracketTeams = topTeams
-
-      if (topTeams.length % 2 !== 0) {
-        // Give bye to top seed
-        byeTeam = topTeams[0]
-        bracketTeams = topTeams.slice(1)
-        await setByeTeamId(byeTeam.id)
-        console.log(`Bye team: ${byeTeam.name}`)
+      // NEW SYSTEM: Include ALL teams in knockout phase
+      const allTeams = standings // All teams advance, no eliminations
+      
+      // Calculate bracket size as next power of 2 >= total teams
+      const bracketSize = Math.pow(2, Math.ceil(Math.log2(allTeams.length)))
+      const byesNeeded = bracketSize - allTeams.length
+      
+      console.log(`🏆 Generating ${bracketSize}-team knockout bracket`)
+      console.log(`👥 ${allTeams.length} teams advance (NO eliminations)`)
+      console.log(`👋 ${byesNeeded} byes awarded to top ${byesNeeded} seeds`)
+      
+      // Distribute byes to top seeds
+      const byeTeams = allTeams.slice(0, byesNeeded)
+      const playingTeams = allTeams.slice(byesNeeded)
+      
+      // Set bye teams (for now, just track the #1 seed as primary bye)
+      if (byeTeams.length > 0) {
+        await setByeTeamId(byeTeams[0].id) // Primary bye team for UI
+        console.log(`✅ Primary bye: #1 ${byeTeams[0].name}`)
+        if (byeTeams.length > 1) {
+          console.log(`✅ Additional byes: ${byeTeams.slice(1).map(t => `#${allTeams.findIndex(team => team.id === t.id) + 1} ${t.name}`).join(', ')}`)
+        }
       } else {
         await setByeTeamId(null)
+        console.log(`ℹ️ No byes needed - perfect bracket size`)
       }
 
       // Create first round matches with proper seeding
       const knockoutMatches: Omit<Match, "id">[] = []
-      const numMatches = Math.floor(bracketTeams.length / 2)
+      const numMatches = Math.floor(playingTeams.length / 2)
 
+      // Create matches with proper tournament seeding (highest vs lowest remaining)
       for (let i = 0; i < numMatches; i++) {
-        const team1 = bracketTeams[i]
-        const team2 = bracketTeams[bracketTeams.length - 1 - i]
+        const team1 = playingTeams[i]  // Higher seed among playing teams
+        const team2 = playingTeams[playingTeams.length - 1 - i]  // Lower seed
+        
+        // Calculate actual seed numbers including bye teams
+        const team1Seed = allTeams.findIndex(t => t.id === team1.id) + 1
+        const team2Seed = allTeams.findIndex(t => t.id === team2.id) + 1
 
         knockoutMatches.push({
           team1,
@@ -182,12 +327,16 @@ export default function PoolPlay({
           phase: "knockout",
           round: 1,
         })
+        
+        console.log(`🥊 Match ${i + 1}: #${team1Seed} ${team1.name} vs #${team2Seed} ${team2.name}`)
       }
 
       if (knockoutMatches.length > 0) {
         await createMatches(knockoutMatches)
       }
 
+      console.log(`🎉 Knockout bracket generated successfully!`)
+      console.log(`📊 Bracket: ${bracketSize} teams, ${byesNeeded} byes, ${knockoutMatches.length} first round matches`)
       onAdvanceToKnockout()
     } catch (error) {
       console.error("Error generating knockout bracket:", error)
@@ -467,6 +616,23 @@ export default function PoolPlay({
             </CardTitle>
           </CardHeader>
           <CardContent>
+            <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+              <h4 className="font-semibold text-blue-900 mb-2">🏆 New Tournament System</h4>
+              <p className="text-sm text-blue-800">
+                <strong>ALL {teams.length} teams advance to knockout!</strong> No eliminations after pool play.
+              </p>
+              <p className="text-sm text-blue-700 mt-1">
+                {(() => {
+                  const bracketSize = Math.pow(2, Math.ceil(Math.log2(teams.length)))
+                  const byesNeeded = bracketSize - teams.length
+                  if (byesNeeded > 0) {
+                    return `📊 ${bracketSize}-team bracket: Top ${byesNeeded} seeds get first-round byes`
+                  } else {
+                    return `📊 Perfect ${bracketSize}-team bracket: No byes needed`
+                  }
+                })()}
+              </p>
+            </div>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -480,32 +646,42 @@ export default function PoolPlay({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {standings.map((team, index) => (
-                  <TableRow key={team.id} className={index < 4 ? "bg-green-50" : ""}>
-                    <TableCell className="font-medium">
-                      {index + 1}
-                      {index < 4 && <Badge className="ml-2 bg-green-100 text-green-800">Q</Badge>}
-                    </TableCell>
-                    <TableCell>
-                      <div>
-                        <div className="font-semibold text-gray-900">{team.name}</div>
-                        <div className="text-sm text-gray-600">{team.players.join(" & ")}</div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-center font-medium">
-                      {team.wins}-{team.losses}
-                    </TableCell>
-                    <TableCell className="text-center">{team.pointsFor}</TableCell>
-                    <TableCell className="text-center">{team.pointsAgainst}</TableCell>
-                    <TableCell className="text-center">
-                      <span className={team.pointDifferential >= 0 ? "text-green-600" : "text-red-600"}>
-                        {team.pointDifferential > 0 ? "+" : ""}
-                        {team.pointDifferential}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-center">{team.gamesPlayed}</TableCell>
-                  </TableRow>
-                ))}
+                {standings.map((team, index) => {
+                  const bracketSize = Math.pow(2, Math.ceil(Math.log2(teams.length)))
+                  const byesNeeded = bracketSize - teams.length
+                  const hasBye = index < byesNeeded
+                  
+                  return (
+                    <TableRow key={team.id} className={hasBye ? "bg-yellow-50" : "bg-green-50"}>
+                      <TableCell className="font-medium">
+                        {index + 1}
+                        {hasBye ? (
+                          <Badge className="ml-2 bg-yellow-100 text-yellow-800">BYE</Badge>
+                        ) : (
+                          <Badge className="ml-2 bg-green-100 text-green-800">PLAY</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div>
+                          <div className="font-semibold text-gray-900">{team.name}</div>
+                          <div className="text-sm text-gray-600">{team.players.join(" & ")}</div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-center font-medium">
+                        {team.wins}-{team.losses}
+                      </TableCell>
+                      <TableCell className="text-center">{team.pointsFor}</TableCell>
+                      <TableCell className="text-center">{team.pointsAgainst}</TableCell>
+                      <TableCell className="text-center">
+                        <span className={team.pointDifferential >= 0 ? "text-green-600" : "text-red-600"}>
+                          {team.pointDifferential > 0 ? "+" : ""}
+                          {team.pointDifferential}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-center">{team.gamesPlayed}</TableCell>
+                    </TableRow>
+                  )
+                })}
               </TableBody>
             </Table>
           </CardContent>
