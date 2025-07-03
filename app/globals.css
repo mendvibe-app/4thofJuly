@@ -1,0 +1,148 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 142 76% 36%;
+    --primary-foreground: 355.7 100% 97.3%;
+    --secondary: 210 40% 98%;
+    --secondary-foreground: 222.2 84% 4.9%;
+    --muted: 210 40% 98%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 98%;
+    --accent-foreground: 222.2 84% 4.9%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 142 76% 36%;
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 142 76% 36%;
+    --primary-foreground: 222.2 84% 4.9%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 142 76% 36%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+/* American Flag Gradients */
+.flag-gradient {
+  background: linear-gradient(135deg, #dc2626 0%, #f8fafc 50%, #2563eb 100%);
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.25);
+  color: #1f2937;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
+  font-weight: 700;
+}
+
+.flag-gradient:hover {
+  background: linear-gradient(135deg, #b91c1c 0%, #f1f5f9 50%, #1d4ed8 100%);
+  box-shadow: 0 6px 16px rgba(220, 38, 38, 0.3);
+  color: #111827;
+}
+
+.flag-gradient:active {
+  background: linear-gradient(135deg, #991b1b 0%, #e2e8f0 50%, #1e40af 100%);
+  transform: translateY(1px);
+  color: #111827;
+}
+
+.flag-gradient-alt {
+  background: linear-gradient(90deg, #dc2626 0%, #dc2626 33%, #f8fafc 33%, #f8fafc 66%, #2563eb 66%, #2563eb 100%);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
+  color: #1f2937;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
+  font-weight: 700;
+}
+
+.flag-gradient-alt:hover {
+  background: linear-gradient(90deg, #b91c1c 0%, #b91c1c 33%, #f1f5f9 33%, #f1f5f9 66%, #1d4ed8 66%, #1d4ed8 100%);
+  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.3);
+  color: #111827;
+}
+
+.flag-gradient-subtle {
+  background: linear-gradient(135deg, #ef4444 0%, #3b82f6 100%);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
+  color: white;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  font-weight: 600;
+}
+
+.flag-gradient-subtle:hover {
+  background: linear-gradient(135deg, #dc2626 0%, #2563eb 100%);
+  box-shadow: 0 6px 16px rgba(239, 68, 68, 0.25);
+  color: white;
+}
+
+/* Tournament specific styles */
+.tournament-gradient {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+}
+
+.score-button {
+  @apply h-16 w-16 rounded-xl font-bold text-xl transition-all duration-200 active:scale-95;
+}
+
+.match-card {
+  @apply bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200;
+}
+
+.team-card {
+  @apply bg-gray-50 rounded-xl p-4 border border-gray-200 transition-all duration-200;
+}
+
+.winner-card {
+  @apply bg-emerald-50 border-emerald-200 ring-2 ring-emerald-100;
+}
+
+.loser-card {
+  @apply bg-gray-50 border-gray-200;
+}
+
+/* Navigation active state with flag theme */
+.nav-flag-active {
+  background: linear-gradient(135deg, #dc2626 0%, #2563eb 100%);
+  color: white;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  border: 0;
+  font-weight: 600;
+}
+
+.nav-flag-active:hover {
+  background: linear-gradient(135deg, #b91c1c 0%, #1d4ed8 100%);
+  color: white;
+}
