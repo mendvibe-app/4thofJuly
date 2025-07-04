@@ -1,11 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 
-// Admin configuration - these can be easily changed during tournament
-const ADMIN_PASSCODES = [
-  'july4admin',      // Main tournament admin
-  'score2024',       // For scorekeepers
-  'official24',      // For tournament officials
-]
+// Admin configuration - this can be easily changed during tournament
+const ADMIN_PASSCODE = 'july4admin'
 
 export function useAdmin() {
   const [isAdmin, setIsAdmin] = useState(false)
@@ -18,11 +14,11 @@ export function useAdmin() {
       try {
         const { isAdmin: savedIsAdmin, adminName: savedAdminName, timestamp } = JSON.parse(savedAdminState)
         
-        // Check if admin session is still valid (expires after 4 hours)
+        // Check if admin session is still valid (expires after 48 hours)
         const now = Date.now()
-        const fourHoursInMs = 4 * 60 * 60 * 1000
+        const fortyEightHoursInMs = 48 * 60 * 60 * 1000
         
-        if (now - timestamp < fourHoursInMs) {
+        if (now - timestamp < fortyEightHoursInMs) {
           setIsAdmin(savedIsAdmin)
           setAdminName(savedAdminName)
           console.log(`🔐 Admin session restored for: ${savedAdminName}`)
@@ -39,7 +35,7 @@ export function useAdmin() {
   }, [])
 
   const isValidPasscode = useCallback((passcode: string) => {
-    return ADMIN_PASSCODES.includes(passcode.toLowerCase().trim())
+    return passcode.toLowerCase().trim() === ADMIN_PASSCODE.toLowerCase()
   }, [])
 
   const loginAsAdmin = useCallback((passcode: string, name: string) => {
