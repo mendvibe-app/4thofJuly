@@ -437,12 +437,12 @@ export default function TeamRegistration({
                         <Checkbox
                           id={`payment-${team.id}`}
                           checked={team.paid}
-                          onCheckedChange={() => handleTogglePayment(team)}
-                          disabled={isSubmitting}
+                          onCheckedChange={isAdmin ? () => handleTogglePayment(team) : undefined}
+                          disabled={isSubmitting || !isAdmin}
                           className="w-6 h-6"
                         />
                         <Label htmlFor={`payment-${team.id}`} className="outdoor-text text-slate-900 font-semibold">
-                          Paid $40
+                          Paid $40 {!isAdmin && "(Admin Only)"}
                         </Label>
                       </div>
                     </div>
