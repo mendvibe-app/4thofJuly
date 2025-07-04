@@ -32,7 +32,8 @@ export default function PoolPlay({
   const [gamesPerTeam, setGamesPerTeam] = useState(3)
   const [isGenerating, setIsGenerating] = useState(false)
   const [editingMatch, setEditingMatch] = useState<number | null>(null)
-  const [tempScores, setTempScores] = useState<{ team1: string; team2: string }>({ team1: "", team2: "" })
+  const [team1Score, setTeam1Score] = useState("")
+  const [team2Score, setTeam2Score] = useState("")
 
   // Calculate team standings
   const calculateStandings = () => {
@@ -372,23 +373,24 @@ export default function PoolPlay({
   }
 
   const handleScoreUpdate = async (matchId: number) => {
-    const team1Score = Number.parseInt(tempScores.team1) || 0
-    const team2Score = Number.parseInt(tempScores.team2) || 0
+    const t1Score = Number.parseInt(team1Score) || 0
+    const t2Score = Number.parseInt(team2Score) || 0
 
-    if (team1Score < 0 || team2Score < 0) {
+    if (t1Score < 0 || t2Score < 0) {
       alert("Scores cannot be negative!")
       return
     }
 
     try {
       await updateMatch(matchId, {
-        team1Score,
-        team2Score,
+        team1Score: t1Score,
+        team2Score: t2Score,
         completed: true,
       })
 
       setEditingMatch(null)
-      setTempScores({ team1: "", team2: "" })
+      setTeam1Score("")
+      setTeam2Score("")
     } catch (error) {
       console.error("Error updating match:", error)
       alert("Failed to update match. Please try again.")
@@ -397,15 +399,14 @@ export default function PoolPlay({
 
   const startEditing = (match: Match) => {
     setEditingMatch(match.id)
-    setTempScores({
-      team1: match.team1Score.toString(),
-      team2: match.team2Score.toString(),
-    })
+    setTeam1Score(match.team1Score.toString())
+    setTeam2Score(match.team2Score.toString())
   }
 
   const cancelEditing = () => {
     setEditingMatch(null)
-    setTempScores({ team1: "", team2: "" })
+    setTeam1Score("")
+    setTeam2Score("")
   }
 
   const setQuickScore = async (matchId: number, team1Score: number, team2Score: number) => {
@@ -577,16 +578,16 @@ export default function PoolPlay({
 
       {/* Admin Testing Tools */}
       {isAdmin && (
-        <Card className="bg-amber-50 border-amber-200 shadow-sm">
+        <Card className="bg-slate-50 border-slate-200 shadow-sm">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-amber-900">Admin Testing Tools</CardTitle>
+            <CardTitle className="flex items-center gap-2 text-slate-900">Admin Testing Tools</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <Button
                 onClick={generateRandomScores}
                 variant="outline"
-                className="border-amber-300 text-amber-700 hover:bg-amber-100 h-11 font-medium bg-transparent"
+                className="border-slate-300 text-slate-700 hover:bg-slate-100 h-11 font-medium bg-transparent"
               >
                 <Shuffle className="w-4 h-4 mr-2" />
                 Random Scores
@@ -594,7 +595,7 @@ export default function PoolPlay({
               <Button
                 onClick={resetAllScores}
                 variant="outline"
-                className="border-amber-300 text-amber-700 hover:bg-amber-100 h-11 font-medium bg-transparent"
+                className="border-slate-300 text-slate-700 hover:bg-slate-100 h-11 font-medium bg-transparent"
               >
                 <RotateCcw className="w-4 h-4 mr-2" />
                 Reset Scores
@@ -603,13 +604,13 @@ export default function PoolPlay({
                 onClick={generateKnockoutBracket}
                 variant="outline"
                 disabled={completedMatches === 0}
-                className="border-amber-300 text-amber-700 hover:bg-amber-100 h-11 font-medium bg-transparent"
+                className="border-slate-300 text-slate-700 hover:bg-slate-100 h-11 font-medium bg-transparent"
               >
                 <Zap className="w-4 h-4 mr-2" />
                 Quick Bracket
               </Button>
             </div>
-            <p className="text-sm text-amber-800 text-center">Testing tools for quick tournament simulation</p>
+            <p className="text-sm text-slate-800 text-center">Testing tools for quick tournament simulation</p>
           </CardContent>
         </Card>
       )}
@@ -661,7 +662,7 @@ export default function PoolPlay({
         <Card className="bg-white border-0 shadow-sm">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-gray-900">
-              <Trophy className="w-5 h-5 text-amber-600" />
+              <Trophy className="w-5 h-5 text-yellow-600" />
               Current Standings
             </CardTitle>
           </CardHeader>
@@ -702,11 +703,11 @@ export default function PoolPlay({
                   const hasBye = index < byesNeeded
                   
                   return (
-                    <TableRow key={team.id} className={hasBye ? "bg-yellow-50" : "bg-green-50"}>
+                    <TableRow key={team.id} className={hasBye ? "bg-blue-50" : "bg-green-50"}>
                       <TableCell className="font-medium">
                         {index + 1}
                         {hasBye ? (
-                          <Badge className="ml-2 bg-yellow-100 text-yellow-800">BYE</Badge>
+                          <Badge className="ml-2 bg-blue-100 text-blue-800">BYE</Badge>
                         ) : (
                           <Badge className="ml-2 bg-green-100 text-green-800">PLAY</Badge>
                         )}
@@ -760,105 +761,224 @@ export default function PoolPlay({
                         : "border-gray-200 bg-gray-50"
                   }`}
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-semibold text-gray-900">{match.team1.name}</span>
-                        <span className="text-2xl font-bold text-gray-900">
-                          {editingMatch === match.id ? (
-                            <Input
-                              type="number"
-                              value={tempScores.team1}
-                              onChange={(e) => setTempScores({ ...tempScores, team1: e.target.value })}
-                              className="w-16 h-8 text-center text-lg font-bold"
-                              min="0"
-                            />
-                          ) : (
-                            match.team1Score
-                          )}
+                  {editingMatch === match.id ? (
+                    <div className="space-y-4">
+                      {/* Team 1 Score Entry - Mobile Optimized */}
+                      <div className="border-2 border-red-200 rounded-lg p-3 bg-gradient-to-r from-red-50 to-white">
+                        <div className="space-y-3">
+                          <div className="text-center">
+                            <div className="font-semibold text-base">{match.team1.name}</div>
+                            <div className="text-sm text-gray-600 mt-1">{match.team1.players?.join(" & ")}</div>
+                          </div>
+
+                          {/* Score Controls */}
+                          <div className="flex items-center justify-center gap-3">
+                            <Button
+                              onClick={() => {
+                                const newScore = Math.max(0, (Number.parseInt(team1Score) || 0) - 1)
+                                setTeam1Score(newScore.toString())
+                              }}
+                              variant="outline"
+                              className="w-12 h-12 rounded-full text-xl font-bold border-2 border-red-300 text-red-700 hover:bg-red-50"
+                            >
+                              −
+                            </Button>
+
+                            <div className="flex flex-col items-center gap-2">
+                              <Input
+                                type="number"
+                                value={team1Score}
+                                onChange={(e) => setTeam1Score(e.target.value)}
+                                placeholder="0"
+                                className="w-20 h-16 text-center text-3xl font-bold border-2 border-red-300 rounded-lg"
+                                min="0"
+                              />
+                              <Button
+                                onClick={() => {
+                                  setTeam1Score("21")
+                                  setTeam2Score("0")
+                                }}
+                                className="bg-red-600 hover:bg-red-700 text-white font-bold px-4 py-2 text-sm rounded-full"
+                                size="sm"
+                              >
+                                🏆 Win
+                              </Button>
+                            </div>
+
+                            <Button
+                              onClick={() => {
+                                const newScore = (Number.parseInt(team1Score) || 0) + 1
+                                setTeam1Score(newScore.toString())
+                              }}
+                              variant="outline"
+                              className="w-12 h-12 rounded-full text-xl font-bold border-2 border-red-300 text-red-700 hover:bg-red-50"
+                            >
+                              +
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* VS Divider */}
+                      <div className="text-center py-2">
+                        <span className="text-lg font-bold text-blue-800 bg-white px-4 py-2 rounded-full border-2 border-blue-300 shadow-sm">
+                          VS
                         </span>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <span className="font-semibold text-gray-900">{match.team2.name}</span>
-                        <span className="text-2xl font-bold text-gray-900">
-                          {editingMatch === match.id ? (
-                            <Input
-                              type="number"
-                              value={tempScores.team2}
-                              onChange={(e) => setTempScores({ ...tempScores, team2: e.target.value })}
-                              className="w-16 h-8 text-center text-lg font-bold"
-                              min="0"
-                            />
-                          ) : (
-                            match.team2Score
-                          )}
-                        </span>
+
+                      {/* Team 2 Score Entry - Mobile Optimized */}
+                      <div className="border-2 border-blue-200 rounded-lg p-3 bg-gradient-to-r from-blue-50 to-white">
+                        <div className="space-y-3">
+                          <div className="text-center">
+                            <div className="font-semibold text-base">{match.team2.name}</div>
+                            <div className="text-sm text-gray-600 mt-1">{match.team2.players?.join(" & ")}</div>
+                          </div>
+
+                          {/* Score Controls */}
+                          <div className="flex items-center justify-center gap-3">
+                            <Button
+                              onClick={() => {
+                                const newScore = Math.max(0, (Number.parseInt(team2Score) || 0) - 1)
+                                setTeam2Score(newScore.toString())
+                              }}
+                              variant="outline"
+                              className="w-12 h-12 rounded-full text-xl font-bold border-2 border-blue-300 text-blue-700 hover:bg-blue-50"
+                            >
+                              −
+                            </Button>
+
+                            <div className="flex flex-col items-center gap-2">
+                              <Input
+                                type="number"
+                                value={team2Score}
+                                onChange={(e) => setTeam2Score(e.target.value)}
+                                placeholder="0"
+                                className="w-20 h-16 text-center text-3xl font-bold border-2 border-blue-300 rounded-lg"
+                                min="0"
+                              />
+                              <Button
+                                onClick={() => {
+                                  setTeam2Score("21")
+                                  setTeam1Score("0")
+                                }}
+                                className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2 text-sm rounded-full"
+                                size="sm"
+                              >
+                                🏆 Win
+                              </Button>
+                            </div>
+
+                            <Button
+                              onClick={() => {
+                                const newScore = (Number.parseInt(team2Score) || 0) + 1
+                                setTeam2Score(newScore.toString())
+                              }}
+                              variant="outline"
+                              className="w-12 h-12 rounded-full text-xl font-bold border-2 border-blue-300 text-blue-700 hover:bg-blue-50"
+                            >
+                              +
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Quick Score Presets - Mobile Optimized */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <Button
+                          onClick={() => {
+                            setTeam1Score("21")
+                            setTeam2Score("19")
+                          }}
+                          variant="outline"
+                          className="h-12 text-sm border-green-300 text-green-700 hover:bg-green-50 font-medium"
+                        >
+                          Close Game 21-19
+                        </Button>
+                        <Button
+                          onClick={() => {
+                            setTeam2Score("21")
+                            setTeam1Score("19")
+                          }}
+                          variant="outline"
+                          className="h-12 text-sm border-green-300 text-green-700 hover:bg-green-50 font-medium"
+                        >
+                          Close Game 19-21
+                        </Button>
+                      </div>
+
+                      {/* Action Buttons - Mobile Optimized */}
+                      <div className="flex flex-col gap-3 pt-2">
+                        <Button
+                          onClick={() => handleScoreUpdate(match.id)}
+                          disabled={team1Score === "" || team2Score === "" || team1Score === team2Score}
+                          className="w-full h-14 text-lg bg-green-600 hover:bg-green-700 font-bold rounded-xl"
+                        >
+                          💾 Save Score
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={cancelEditing}
+                          className="w-full h-12 text-base border-2 border-gray-300 rounded-xl"
+                        >
+                          ❌ Cancel
+                        </Button>
                       </div>
                     </div>
-
-                    {isAdmin && (
-                      <div className="ml-4 flex flex-col gap-2">
-                        {editingMatch === match.id ? (
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              onClick={() => handleScoreUpdate(match.id)}
-                              className="flag-gradient h-10 px-4 font-medium"
-                            >
-                              Save
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={cancelEditing}
-                              className="border-gray-300 text-gray-700 hover:bg-gray-50 h-10 px-4 bg-transparent"
-                            >
-                              Cancel
-                            </Button>
-                          </div>
-                        ) : (
-                          <div className="flex flex-col gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => startEditing(match)}
-                              className="border-gray-300 text-gray-700 hover:bg-gray-50 h-10 px-4"
-                            >
-                              {match.completed ? "Edit" : "Enter Score"}
-                            </Button>
-                            {!match.completed && (
-                              <div className="flex gap-1">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => setQuickScore(match.id, 21, 0)}
-                                  className="border-green-300 text-green-700 hover:bg-green-50 h-8 px-2 text-xs"
-                                >
-                                  21-0
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => setQuickScore(match.id, 0, 21)}
-                                  className="border-green-300 text-green-700 hover:bg-green-50 h-8 px-2 text-xs"
-                                >
-                                  0-21
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => setQuickScore(match.id, 21, 19)}
-                                  className="border-blue-300 text-blue-700 hover:bg-blue-50 h-8 px-2 text-xs"
-                                >
-                                  21-19
-                                </Button>
-                              </div>
-                            )}
-                          </div>
-                        )}
+                  ) : (
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-semibold text-gray-900">{match.team1.name}</span>
+                          <span className="score-display">{match.team1Score}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-gray-900">{match.team2.name}</span>
+                          <span className="score-display">{match.team2Score}</span>
+                        </div>
                       </div>
-                    )}
-                  </div>
+
+                      {isAdmin && (
+                        <div className="ml-4 flex flex-col gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => startEditing(match)}
+                            className="border-gray-300 text-gray-700 hover:bg-gray-50 h-12 px-4 outdoor-text"
+                          >
+                            {match.completed ? "Edit Score" : "Enter Score"}
+                          </Button>
+                          {!match.completed && (
+                            <div className="flex gap-1">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setQuickScore(match.id, 21, 0)}
+                                className="border-green-300 text-green-700 hover:bg-green-50 h-10 px-3 text-xs outdoor-text"
+                              >
+                                21-0
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setQuickScore(match.id, 0, 21)}
+                                className="border-green-300 text-green-700 hover:bg-green-50 h-10 px-3 text-xs outdoor-text"
+                              >
+                                0-21
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setQuickScore(match.id, 21, 19)}
+                                className="border-blue-300 text-blue-700 hover:bg-blue-50 h-10 px-3 text-xs outdoor-text"
+                              >
+                                21-19
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {match.completed && (
                     <div className="mt-2 text-center">

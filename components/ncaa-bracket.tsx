@@ -248,9 +248,9 @@ export default function NCAABracket({ teams, matches, updateMatch, createMatches
       {/* Tournament Header */}
       <div className="text-center space-y-4">
         <div className="flex items-center justify-center gap-2">
-          <Trophy className="w-8 h-8 text-yellow-500" />
+          <Trophy className="w-8 h-8 text-yellow-600" />
           <h2 className="text-3xl font-bold">Knockout Tournament</h2>
-          <Trophy className="w-8 h-8 text-yellow-500" />
+          <Trophy className="w-8 h-8 text-yellow-600" />
         </div>
         
         {matches.length === 0 && isAdmin && (
@@ -333,12 +333,12 @@ export default function NCAABracket({ teams, matches, updateMatch, createMatches
               return (
                 <div className="text-center space-y-4">
                   <div className="flex items-center justify-center gap-3">
-                    <Crown className="w-8 h-8 text-yellow-500" />
+                    <Crown className="w-8 h-8 text-yellow-600" />
                     <h2 className="text-2xl font-bold">🏆 TOURNAMENT CHAMPION 🏆</h2>
-                    <Crown className="w-8 h-8 text-yellow-500" />
+                    <Crown className="w-8 h-8 text-yellow-600" />
                   </div>
                   <div className="inline-flex items-center gap-3 bg-yellow-50 border-2 border-yellow-300 rounded-xl p-6">
-                    <Badge className="w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold bg-yellow-500">
+                    <Badge className="w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold bg-yellow-600">
                       {championSeed}
                     </Badge>
                     <span className="text-2xl font-bold">{champion.name}</span>

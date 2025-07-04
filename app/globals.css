@@ -4,48 +4,64 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 142 76% 36%;
-    --primary-foreground: 355.7 100% 97.3%;
-    --secondary: 210 40% 98%;
-    --secondary-foreground: 222.2 84% 4.9%;
-    --muted: 210 40% 98%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 98%;
-    --accent-foreground: 222.2 84% 4.9%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 142 76% 36%;
-    --radius: 0.75rem;
+    /* US Soccer-inspired color palette */
+    --usa-red: 220 38 38;
+    --usa-blue: 29 78 216;
+    --usa-white: 248 250 252;
+    --usa-navy: 30 41 59;
+    --usa-silver: 148 163 184;
+    
+    /* High contrast colors for outdoor use */
+    --background: 15 23 42;
+    --foreground: 255 255 255;
+    --card: 255 255 255;
+    --card-foreground: 15 23 42;
+    --popover: 255 255 255;
+    --popover-foreground: 15 23 42;
+    --primary: 220 38 38;
+    --primary-foreground: 248 250 252;
+    --secondary: 241 245 249;
+    --secondary-foreground: 15 23 42;
+    --muted: 241 245 249;
+    --muted-foreground: 100 116 139;
+    --accent: 29 78 216;
+    --accent-foreground: 248 250 252;
+    --destructive: 239 68 68;
+    --destructive-foreground: 248 250 252;
+    --border: 226 232 240;
+    --input: 226 232 240;
+    --ring: 220 38 38;
+    --radius: 1rem;
+    
+    /* Tournament-specific colors */
+    --winner-bg: 34 197 94;
+    --winner-fg: 255 255 255;
+    --live-bg: 239 68 68;
+    --live-fg: 255 255 255;
+    --final-bg: 100 116 139;
+    --final-fg: 255 255 255;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 142 76% 36%;
-    --primary-foreground: 222.2 84% 4.9%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 142 76% 36%;
+    --background: 15 23 42;
+    --foreground: 248 250 252;
+    --card: 30 41 59;
+    --card-foreground: 248 250 252;
+    --popover: 30 41 59;
+    --popover-foreground: 248 250 252;
+    --primary: 220 38 38;
+    --primary-foreground: 248 250 252;
+    --secondary: 51 65 85;
+    --secondary-foreground: 248 250 252;
+    --muted: 51 65 85;
+    --muted-foreground: 148 163 184;
+    --accent: 29 78 216;
+    --accent-foreground: 248 250 252;
+    --destructive: 239 68 68;
+    --destructive-foreground: 248 250 252;
+    --border: 51 65 85;
+    --input: 51 65 85;
+    --ring: 220 38 38;
   }
 }
 
@@ -53,96 +69,405 @@
   * {
     @apply border-border;
   }
+  
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
+    /* Minimum 16px base font size for outdoor readability */
+    font-size: 16px;
+    line-height: 1.5;
+    /* Prevent zoom on iOS */
+    -webkit-text-size-adjust: 100%;
+    /* Smooth scrolling */
+    scroll-behavior: smooth;
+    /* Force white background to override any inherited styling */
+    background-color: #0f172a !important;
+  }
+  
+  /* High contrast focus for accessibility */
+  *:focus-visible {
+    @apply outline-none ring-4 ring-red-500/30;
   }
 }
 
-/* American Flag Gradients */
-.flag-gradient {
-  background: linear-gradient(135deg, #dc2626 0%, #f8fafc 50%, #2563eb 100%);
-  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.25);
-  color: #1f2937;
-  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
-  font-weight: 700;
+@layer components {
+  /* US Soccer patriotic styling - clean and professional */
+  .usa-header-gradient {
+    background: linear-gradient(135deg, #dc2626 0%, #dc2626 40%, #1d4ed8 60%, #1d4ed8 100%);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+  }
+  
+  .usa-button-gradient {
+    background: #dc2626;
+    box-shadow: 0 4px 12px rgba(220, 38, 38, 0.25);
+    border: 2px solid #1d4ed8;
+    color: white !important;
+    font-weight: 600;
+    transition: all 0.2s ease;
+  }
+  
+  .usa-button-gradient:hover {
+    background: #b91c1c;
+    box-shadow: 0 6px 20px rgba(220, 38, 38, 0.35);
+    transform: translateY(-2px);
+    border-color: #1e40af;
+  }
+  
+  .usa-button-gradient:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 8px rgba(220, 38, 38, 0.3);
+    background: #991b1b;
+  }
+  
+  /* Mobile-first touch targets - minimum 64px */
+  .touch-target {
+    @apply min-h-[64px] min-w-[64px] flex items-center justify-center;
+    /* Ensure adequate spacing around touch targets */
+    margin: 4px;
+  }
+
+  /* AGGRESSIVE override for brownish input fields */
+  input[type="text"], 
+  input[type="number"], 
+  input[type="email"], 
+  input[type="password"],
+  textarea,
+  .tournament-card input,
+  .tournament-card textarea,
+  input {
+    background-color: #ffffff !important;
+    border: 2px solid #e2e8f0 !important;
+    color: #0f172a !important;
+    border-radius: 0.75rem !important;
+    padding: 1rem !important;
+    font-size: 1.125rem !important;
+    min-height: 3rem !important;
+  }
+  
+  input[type="text"]:focus,
+  input[type="number"]:focus, 
+  input[type="email"]:focus,
+  input[type="password"]:focus,
+  textarea:focus,
+  .tournament-card input:focus,
+  .tournament-card textarea:focus,
+  input:focus {
+    background-color: #ffffff !important;
+    border-color: #dc2626 !important;
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.2) !important;
+    outline: none !important;
+  }
+  
+  /* AGGRESSIVE override for brownish buttons */
+  .tournament-card button[variant="outline"],
+  button[variant="outline"],
+  .tournament-card button.border-slate-300,
+  button.border-slate-300 {
+    background-color: #ffffff !important;
+    border: 2px solid #e2e8f0 !important;
+    color: #475569 !important;
+  }
+  
+  .tournament-card button[variant="outline"]:hover,
+  button[variant="outline"]:hover,
+  .tournament-card button.border-slate-300:hover,
+  button.border-slate-300:hover {
+    background-color: #f1f5f9 !important;
+    border-color: #cbd5e1 !important;
+  }
+  
+  /* Force override ANY brownish/tan colors on inputs and buttons */
+  
+  /* Specific brownish color overrides */
+  *[style*="background-color: #8B4513"],
+  *[style*="background-color: #D2691E"],
+  *[style*="background-color: #CD853F"],
+  *[style*="background-color: #DEB887"],
+  *[style*="background-color: #F4A460"],
+  *[style*="background-color: #D2B48C"],
+  *[style*="background-color: #BC8F8F"],
+  *[style*="background-color: #A0522D"],
+  .bg-\[hsl\(28\,_87\%\,_67\%\)\] {
+    background-color: #ffffff !important;
+    border-color: #e2e8f0 !important;
+  }
+  
+  /* Large score displays for distance reading */
+  .score-display {
+    @apply text-6xl font-black;
+    /* Ensure scores are readable from distance */
+    text-shadow: 2px 2px 0px rgba(0, 0, 0, 0.3);
+    line-height: 1;
+    /* Force proper color - no more brown! */
+    color: #0f172a !important;
+  }
+  
+  .score-display-small {
+    @apply text-4xl font-black;
+    text-shadow: 1px 1px 0px rgba(0, 0, 0, 0.3);
+    line-height: 1;
+    /* Force proper color - no more brown! */
+    color: #0f172a !important;
+  }
+  
+  /* Tournament cards with high contrast */
+  .tournament-card {
+    @apply bg-white rounded-2xl border border-slate-200 shadow-lg;
+    @apply hover:shadow-xl transition-all duration-300;
+    /* Ensure good contrast ratio */
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    /* Force white background to override any inherited styling */
+    background-color: #ffffff !important;
+  }
+  
+  .tournament-card:hover {
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+  }
+  
+  /* Status indicators */
+  .status-live {
+    @apply bg-red-500 text-white px-4 py-2 rounded-full font-bold text-sm;
+    animation: pulse 2s infinite;
+  }
+  
+  .status-final {
+    @apply bg-slate-600 text-white px-4 py-2 rounded-full font-bold text-sm;
+  }
+  
+  .status-winner {
+    @apply bg-green-500 text-white px-4 py-2 rounded-full font-bold text-sm;
+  }
+  
+  /* Championship indicators */
+  .champion-badge {
+    @apply bg-yellow-600 text-white px-6 py-3 rounded-full font-black text-lg;
+    background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+    color: #ffffff;
+    box-shadow: 0 4px 12px rgba(255, 215, 0, 0.4);
+  }
+  
+  .champion-badge::before {
+    content: "👑 ";
+    font-size: 1.25em;
+  }
+  
+  /* Mobile bottom navigation */
+  .bottom-nav {
+    @apply fixed bottom-0 left-0 right-0 bg-white border-t-2 border-gray-200;
+    @apply safe-area-inset-bottom z-50;
+    box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.1);
+  }
+  
+  .bottom-nav-item {
+    @apply flex-1 flex flex-col items-center justify-center;
+    @apply touch-target text-center transition-all duration-200;
+    @apply text-gray-600 hover:text-red-600;
+  }
+  
+  .bottom-nav-item.active {
+    @apply text-red-600 font-semibold;
+  }
+  
+  .bottom-nav-item.active::after {
+    content: "";
+    @apply absolute -top-1 left-1/2 transform -translate-x-1/2;
+    @apply w-1 h-1 bg-red-600 rounded-full;
+  }
+  
+  /* Sticky header */
+  .sticky-header {
+    @apply sticky top-0 z-40 backdrop-blur-sm;
+    @apply border-b-2 border-gray-200/50;
+  }
+  
+  /* Large text for outdoor readability */
+  .outdoor-text {
+    @apply text-lg font-medium;
+    /* Minimum 18px for outdoor use */
+    font-size: max(18px, 1.125rem);
+  }
+  
+  .outdoor-text-large {
+    @apply text-xl font-semibold;
+    /* Minimum 20px for outdoor use */
+    font-size: max(20px, 1.25rem);
+  }
+  
+  /* Pull-up modal for mobile */
+  .modal-pull-up {
+    @apply fixed inset-x-0 bottom-0 z-50;
+    @apply bg-white rounded-t-3xl shadow-2xl;
+    @apply transform transition-transform duration-300 ease-out;
+    max-height: 90vh;
+  }
+  
+  .modal-pull-up.closed {
+    transform: translateY(100%);
+  }
+  
+  .modal-pull-up.open {
+    transform: translateY(0);
+  }
+  
+  /* Score entry buttons - optimized for outdoor use */
+  .score-button {
+    @apply touch-target bg-white border-4 border-gray-300;
+    @apply rounded-2xl font-black text-2xl;
+    @apply hover:border-red-500 hover:bg-red-50 hover:text-red-600;
+    @apply active:scale-95 transition-all duration-150;
+    @apply shadow-lg hover:shadow-xl;
+    min-width: 80px;
+    min-height: 80px;
+  }
+  
+  .score-button-plus {
+    @apply score-button bg-green-500 border-green-500 text-white;
+    @apply hover:bg-green-600 hover:border-green-600;
+  }
+  
+  .score-button-minus {
+    @apply score-button bg-red-500 border-red-500 text-white;
+    @apply hover:bg-red-600 hover:border-red-600;
+  }
+  
+  /* Team cards with payment status */
+  .team-card {
+    @apply tournament-card p-6 relative;
+  }
+  
+  .team-card.paid {
+    @apply border-green-300 bg-green-50;
+  }
+  
+  .team-card.paid::before {
+    content: "✅";
+    @apply absolute top-4 right-4 text-2xl;
+  }
+  
+  .team-card.unpaid {
+    @apply border-slate-300 bg-slate-50;
+  }
+  
+  .team-card.unpaid::before {
+    content: "⏳";
+    @apply absolute top-4 right-4 text-2xl;
+  }
+  
+  /* Match cards */
+  .match-card {
+    @apply tournament-card overflow-hidden;
+  }
+  
+  .match-card.live {
+    @apply border-blue-400 bg-blue-50;
+    animation: pulse-border 2s infinite;
+  }
+  
+  .match-card.final {
+    @apply border-slate-400 bg-slate-50;
+  }
+  
+  .match-card.winner {
+    @apply border-green-400 bg-green-50;
+  }
+  
+  /* Animations */
+  @keyframes pulse-border {
+    0%, 100% { border-color: hsl(var(--usa-red)); }
+    50% { border-color: hsl(var(--usa-blue)); }
+  }
+  
+  /* Safe area adjustments for mobile */
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top);
+  }
+  
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  
+  .safe-area-inset-bottom {
+    padding-bottom: calc(env(safe-area-inset-bottom) + 1rem);
+  }
+  
+  /* High contrast mode support */
+  @media (prefers-contrast: high) {
+    .tournament-card {
+      @apply border-4 border-black;
+    }
+    
+    .score-display {
+      text-shadow: 3px 3px 0px #000;
+    }
+    
+    .usa-button-gradient {
+      border: 3px solid #000;
+    }
+  }
+  
+  /* Reduce motion for accessibility */
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
 }
 
-.flag-gradient:hover {
-  background: linear-gradient(135deg, #b91c1c 0%, #f1f5f9 50%, #1d4ed8 100%);
-  box-shadow: 0 6px 16px rgba(220, 38, 38, 0.3);
-  color: #111827;
+/* Utility classes for tournament-specific styling */
+.text-score {
+  @apply text-6xl font-black leading-none;
+  text-shadow: 2px 2px 0px rgba(0, 0, 0, 0.3);
+  /* Force proper color - no more brown! */
+  color: #0f172a !important;
 }
 
-.flag-gradient:active {
-  background: linear-gradient(135deg, #991b1b 0%, #e2e8f0 50%, #1e40af 100%);
-  transform: translateY(1px);
-  color: #111827;
+.text-score-small {
+  @apply text-4xl font-black leading-none;
+  text-shadow: 1px 1px 0px rgba(0, 0, 0, 0.3);
+  /* Force proper color - no more brown! */
+  color: #0f172a !important;
 }
 
-.flag-gradient-alt {
-  background: linear-gradient(90deg, #dc2626 0%, #dc2626 33%, #f8fafc 33%, #f8fafc 66%, #2563eb 66%, #2563eb 100%);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
-  color: #1f2937;
-  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
-  font-weight: 700;
-}
-
-.flag-gradient-alt:hover {
-  background: linear-gradient(90deg, #b91c1c 0%, #b91c1c 33%, #f1f5f9 33%, #f1f5f9 66%, #1d4ed8 66%, #1d4ed8 100%);
-  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.3);
-  color: #111827;
-}
-
-.flag-gradient-subtle {
+.bg-tournament-gradient {
   background: linear-gradient(135deg, #ef4444 0%, #3b82f6 100%);
-  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
-  color: white;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-  font-weight: 600;
 }
 
-.flag-gradient-subtle:hover {
-  background: linear-gradient(135deg, #dc2626 0%, #2563eb 100%);
-  box-shadow: 0 6px 16px rgba(239, 68, 68, 0.25);
-  color: white;
+.winner-glow {
+  box-shadow: 0 0 20px rgba(34, 197, 94, 0.4);
 }
 
-/* Tournament specific styles */
-.tournament-gradient {
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+.live-glow {
+  box-shadow: 0 0 20px rgba(37, 99, 235, 0.4);
 }
 
-.score-button {
-  @apply h-16 w-16 rounded-xl font-bold text-xl transition-all duration-200 active:scale-95;
+/* ULTIMATE OVERRIDE - Force white backgrounds for all form elements */
+html body div input,
+html body div.tournament-card input,
+html body div.tournament-card textarea,
+html body div.tournament-card button,
+html body div input[type="text"],
+html body div input[type="number"],
+html body div input[type="email"],
+html body div input[type="password"],
+html body div textarea,
+html body * input,
+html body * textarea,
+html body * button:not(.usa-button-gradient):not(.bg-red-500):not(.bg-blue-500):not(.bg-green-500) {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  color: #0f172a !important;
 }
 
-.match-card {
-  @apply bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200;
-}
-
-.team-card {
-  @apply bg-gray-50 rounded-xl p-4 border border-gray-200 transition-all duration-200;
-}
-
-.winner-card {
-  @apply bg-emerald-50 border-emerald-200 ring-2 ring-emerald-100;
-}
-
-.loser-card {
-  @apply bg-gray-50 border-gray-200;
-}
-
-/* Navigation active state with flag theme */
-.nav-flag-active {
-  background: linear-gradient(135deg, #dc2626 0%, #2563eb 100%);
-  color: white;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-  border: 0;
-  font-weight: 600;
-}
-
-.nav-flag-active:hover {
-  background: linear-gradient(135deg, #b91c1c 0%, #1d4ed8 100%);
-  color: white;
+/* Target the specific brown/tan color that's showing up */
+.tournament-card input[placeholder*="name"],
+.tournament-card input[placeholder*="Player"],
+.tournament-card input[placeholder*="team"],
+.tournament-card button:not(.usa-button-gradient) {
+  background-color: #ffffff !important;
+  border: 2px solid #e2e8f0 !important;
+  color: #0f172a !important;
 }
