@@ -27,6 +27,7 @@ import TeamRegistration from "@/components/team-registration"
 import PoolPlay from "@/components/pool-play"
 import KnockoutBracket from "@/components/knockout-bracket"
 import NCAABracket from "@/components/ncaa-bracket"
+import LiveBanner from "@/components/live-banner"
 import { useTournamentData } from "@/hooks/use-tournament-data"
 import { useAdmin } from "@/hooks/use-admin"
 
@@ -60,7 +61,7 @@ export default function TournamentApp() {
     setShowMobileMenu(false)
   }
 
-  const totalRevenue = teams.filter((team) => team.paid).length * 40
+  const totalCash = teams.filter((team) => team.paid).length * 40
   const paidTeams = teams.filter((team) => team.paid).length
 
   const renderPhaseContent = () => {
@@ -84,6 +85,7 @@ export default function TournamentApp() {
             createMatches={createMatches}
             onAdvanceToKnockout={() => updateTournamentPhase("knockout")}
             setByeTeamId={setByeTeamId}
+            resetTournament={resetTournament}
           />
         )
       case "knockout":
@@ -315,6 +317,9 @@ export default function TournamentApp() {
         </div>
       )}
 
+      {/* Live Banner */}
+      <LiveBanner />
+
       {/* Tournament Stats Dashboard */}
       <div className="px-4 py-6 pb-24 space-y-6">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -336,8 +341,8 @@ export default function TournamentApp() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="outdoor-text text-slate-600 font-medium">Revenue</p>
-                  <p className="text-4xl font-black text-slate-900">${totalRevenue}</p>
+                                  <p className="outdoor-text text-slate-600 font-medium">Cash</p>
+                <p className="text-4xl font-black text-slate-900">${totalCash}</p>
                 </div>
                 <div className="p-3 bg-green-100 rounded-2xl">
                   <DollarSign className="w-8 h-8 text-green-600" />
@@ -398,13 +403,7 @@ export default function TournamentApp() {
                   </CardDescription>
                 </div>
               </div>
-              
-              {connectionStatus === "connected" && realtimeConnected && (
-                <div className="status-live">
-                  <Radio className="w-4 h-4 inline mr-1" />
-                  LIVE
-                </div>
-              )}
+
             </div>
           </CardHeader>
           <CardContent className="p-6">
