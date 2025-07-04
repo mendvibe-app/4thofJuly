@@ -241,20 +241,6 @@ export default function TeamRegistration({
 
   return (
     <div className="space-y-6">
-      {/* Live Status */}
-      <Card className="bg-gradient-to-r from-green-50 to-blue-50 border-2 border-green-300">
-        <CardContent className="p-4">
-          <div className="flex items-center justify-center gap-3 text-center">
-            <Wifi className="w-5 h-5 text-green-600" />
-            <span className="text-green-800 font-bold">LIVE REGISTRATION</span>
-            <span className="text-gray-600">•</span>
-            <span className="text-blue-800 font-medium">Anyone can add teams</span>
-            <span className="text-gray-600">•</span>
-            <span className="text-purple-800 font-medium">Updates instantly for everyone</span>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Add Team Form */}
       <Card className="bg-white border-0 shadow-sm">
         <CardHeader>

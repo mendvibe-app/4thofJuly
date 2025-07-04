@@ -1,25 +1,44 @@
 "use client"
 
-import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft } from "lucide-react"
 import { useRouter } from "next/navigation"
 import Standings from "@/components/standings"
-import type { Team, Match } from "@/types/tournament"
+import { useTournamentData } from "@/hooks/use-tournament-data"
 
 export default function StandingsPage() {
-  const [teams, setTeams] = useState<Team[]>([])
-  const [poolPlayMatches, setPoolPlayMatches] = useState<Match[]>([])
   const router = useRouter()
+  const { teams, poolPlayMatches, loading, connectionStatus } = useTournamentData()
 
-  // Load data from localStorage on mount
-  useEffect(() => {
-    const savedTeams = localStorage.getItem("tournament-teams")
-    const savedPoolPlayMatches = localStorage.getItem("pool-play-matches")
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-red-100 via-white to-blue-100 p-2 sm:p-4 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-6xl mb-4">🔄</div>
+          <h2 className="text-2xl font-bold text-blue-900 mb-2">Loading Tournament Data...</h2>
+          <p className="text-blue-700">Please wait while we load the standings</p>
+        </div>
+      </div>
+    )
+  }
 
-    if (savedTeams) setTeams(JSON.parse(savedTeams))
-    if (savedPoolPlayMatches) setPoolPlayMatches(JSON.parse(savedPoolPlayMatches))
-  }, [])
+  if (connectionStatus === "error") {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-red-100 via-white to-blue-100 p-2 sm:p-4 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-6xl mb-4">❌</div>
+          <h2 className="text-2xl font-bold text-red-900 mb-2">Connection Error</h2>
+          <p className="text-red-700 mb-6">Failed to load tournament data from database</p>
+          <Button
+            onClick={() => router.push("/")}
+            className="bg-blue-600 hover:bg-blue-700 text-white font-bold min-h-[48px] px-6"
+          >
+            🏠 Return to Tournament
+          </Button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-red-100 via-white to-blue-100 p-2 sm:p-4 relative overflow-hidden">
@@ -31,14 +50,21 @@ export default function StandingsPage() {
       </div>
 
       <div className="max-w-6xl mx-auto relative z-10">
-        {/* Back Button */}
-        <div className="mb-6">
+        {/* Navigation */}
+        <div className="mb-6 flex flex-wrap gap-3">
           <Button
             onClick={() => router.push("/")}
             variant="outline"
             className="border-blue-300 text-blue-700 hover:bg-blue-50 bg-transparent min-h-[44px]"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />🏠 Back to Tournament
+          </Button>
+          <Button
+            onClick={() => router.push("/rules")}
+            variant="outline"
+            className="border-gray-300 text-gray-700 hover:bg-gray-50 bg-transparent min-h-[44px]"
+          >
+            📋 Rules
           </Button>
         </div>
 

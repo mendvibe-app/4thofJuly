@@ -61,7 +61,7 @@ export default function Standings({ teams, matches, showTitle = true }: Standing
     if (position === 1) return "🔥"
     if (position === 2) return "💪"
     if (position === 3) return "👏"
-    if (position === totalTeams) return "🍕"
+    if (position === totalTeams) return "🍻"
     return ""
   }
 
@@ -221,7 +221,7 @@ export default function Standings({ teams, matches, showTitle = true }: Standing
                 <span className="font-semibold text-amber-800">3rd Place</span>
               </div>
               <div className="flex items-center justify-center gap-2 p-2 bg-red-100 rounded-lg border border-red-300">
-                <span className="text-2xl">🍕</span>
+                <span className="text-2xl">🍻</span>
                 <span className="font-semibold text-red-800">Last Place</span>
               </div>
             </div>

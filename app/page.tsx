@@ -127,7 +127,10 @@ export default function TournamentApp() {
           <h1 className="text-3xl sm:text-4xl font-bold mb-2 text-red-600">
             4th of July Invitational
           </h1>
-          <p className="text-gray-600 font-medium">Harbor Way Soccer Tennis Tournament</p>
+          <h2 className="text-2xl sm:text-3xl font-bold mb-2 text-white" style={{ textShadow: '2px 2px 0px #000000, -2px -2px 0px #000000, 2px -2px 0px #000000, -2px 2px 0px #000000' }}>
+            16th Annual
+          </h2>
+          <p className="text-blue-600 font-medium text-lg">Harbor Way Soccer Tennis Tournament</p>
         </div>
 
         {/* Stats Cards */}
@@ -239,6 +242,13 @@ export default function TournamentApp() {
               className="border-gray-300 text-gray-700 hover:bg-gray-50 h-11 bg-transparent"
             >
               Standings
+            </Button>
+            <Button
+              onClick={() => window.open("/rules", "_blank")}
+              variant="outline"
+              className="border-gray-300 text-gray-700 hover:bg-gray-50 h-11 bg-transparent"
+            >
+              Rules
             </Button>
           </div>
           <Button

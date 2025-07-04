@@ -262,26 +262,44 @@ export default function KnockoutBracket({ matches, poolPlayMatches, updateMatch,
           const nextRoundMatches = matches.filter((m) => m.phase === "knockout" && m.round === currentRound + 1)
           const isLastPossibleRound = currentRound === Math.ceil(Math.log2(bracketSize))
           
+          console.log(`🔍 Single match completed in round ${currentRound}:`)
+          console.log(`  📊 Bracket size: ${bracketSize}, expected final round: ${Math.ceil(Math.log2(bracketSize))}`)
+          console.log(`  🏆 Is last possible round: ${isLastPossibleRound}`)
+          console.log(`  📋 Next round matches exist: ${nextRoundMatches.length}`)
+          
           if (isLastPossibleRound && nextRoundMatches.length === 0) {
             // Tournament complete - set champion
             const finalMatch = currentRoundMatches[0]
             const winner = finalMatch.team1Score > finalMatch.team2Score ? finalMatch.team1 : finalMatch.team2
+            console.log(`🏆 Tournament complete! Champion: ${winner.name}`)
             setChampion(winner)
           } else if (nextRoundMatches.length === 0) {
             // This is just a single match in an early round - advance normally
+            console.log(`🚀 Advancing from single match in round ${currentRound}`)
+            
             // Get winner from the single match
             const winner = currentRoundMatches[0].team1Score > currentRoundMatches[0].team2Score ? 
               currentRoundMatches[0].team1 : currentRoundMatches[0].team2
+            console.log(`  🥇 Winner: ${winner.name}`)
+            
             const winners = [winner]
             
             // For the first round, add all bye teams
             if (currentRound === 1 && byeTeams.length > 0) {
+              console.log(`  👋 Adding ${byeTeams.length} bye teams to advancement`)
+              byeTeams.forEach(team => {
+                console.log(`    #${getSeedNumber(team)} ${team.name} - BYE`)
+              })
               winners.unshift(...byeTeams)
             }
+            
+            console.log(`  👥 Total advancing teams: ${winners.length}`)
             
             if (winners.length >= 2) {
               // Sort by seed number to maintain proper bracket seeding
               winners.sort((a, b) => getSeedNumber(a) - getSeedNumber(b))
+              
+              console.log(`  🎯 Creating next round matches:`)
               
               // Create next round matches
               const nextRoundMatchesToCreate: Omit<Match, "id">[] = []
@@ -294,6 +312,10 @@ export default function KnockoutBracket({ matches, poolPlayMatches, updateMatch,
                   console.error(`❌ Invalid teams for match ${i}:`, { team1, team2 })
                   continue
                 }
+                
+                const team1Seed = getSeedNumber(team1)
+                const team2Seed = getSeedNumber(team2)
+                console.log(`    🥊 Match ${i + 1}: #${team1Seed} ${team1.name} vs #${team2Seed} ${team2.name}`)
                 
                 nextRoundMatchesToCreate.push({
                   team1,
