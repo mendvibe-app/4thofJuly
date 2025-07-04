@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Trash2, Edit2, Users, Wifi, Plus, Crown } from "lucide-react"
 import type { Team } from "@/types/tournament"
+import { useAdmin } from "@/hooks/use-admin"
 
 interface TeamRegistrationProps {
   teams: Team[]
@@ -25,6 +26,7 @@ export default function TeamRegistration({
   deleteTeam,
   onStartTournament,
 }: TeamRegistrationProps) {
+  const { isAdmin } = useAdmin()
   const [teamName, setTeamName] = useState("")
   const [player1, setPlayer1] = useState("")
   const [player2, setPlayer2] = useState("")
@@ -461,15 +463,15 @@ export default function TeamRegistration({
         </Card>
       )}
 
-      {/* Tournament Start */}
-      {teams.length > 0 && (
+      {/* Tournament Start - Admin Only */}
+      {isAdmin && teams.length > 0 && (
         <Card className="tournament-card bg-gradient-to-r from-blue-50/20 to-red-50/20 border-red-200/50">
-          <CardContent className="p-8">
-            <div className="text-center space-y-6">
+          <CardContent className="p-6">
+            <div className="text-center space-y-4">
               <div className="space-y-2">
                 {!canStartTournament && (
-                  <div className="p-4 bg-orange-100 rounded-xl border border-orange-200">
-                    <p className="outdoor-text-large text-orange-800 font-bold">
+                  <div className="p-3 bg-orange-100 rounded-lg border border-orange-200">
+                    <p className="text-sm sm:text-base text-orange-800 font-bold">
                       {teams.length < 4
                         ? `Need at least 4 teams to start tournament (currently ${teams.length})`
                         : `Maximum 16 teams allowed (currently ${teams.length})`}
@@ -478,8 +480,8 @@ export default function TeamRegistration({
                 )}
                 
                 {canStartTournament && (
-                  <div className="p-4 bg-green-100 rounded-xl border border-green-200">
-                    <p className="outdoor-text-large text-green-800 font-bold">
+                  <div className="p-3 bg-green-100 rounded-lg border border-green-200">
+                    <p className="text-sm sm:text-base text-green-800 font-bold">
                       🎉 Ready to start tournament with {teams.length} teams!
                     </p>
                   </div>
@@ -497,17 +499,17 @@ export default function TeamRegistration({
                 }}
                 disabled={!canStartTournament || isSubmitting}
                 size="lg"
-                className="usa-button-gradient touch-target px-12 py-6 font-black text-xl"
+                className="usa-button-gradient w-full sm:w-auto h-12 sm:h-14 px-6 sm:px-12 py-3 sm:py-4 font-bold text-base sm:text-lg"
               >
                 {isSubmitting ? "Starting..." : (
-                  <div className="flex items-center gap-3">
-                    <Crown className="w-8 h-8" />
-                    Start Tournament ({teams.length} teams)
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <Crown className="w-5 h-5 sm:w-6 sm:h-6" />
+                    <span className="truncate">Start Tournament ({teams.length})</span>
                   </div>
                 )}
               </Button>
               
-              <p className="outdoor-text text-slate-600 font-medium">
+              <p className="text-xs sm:text-sm text-slate-600 font-medium">
                 Set games per team in the next step
               </p>
             </div>
