@@ -7,8 +7,8 @@ The tournament now has a comprehensive admin system that controls who can edit s
 
 ### 🔐 Admin Access Control
 - **Passcode-based authentication**: No user accounts needed, just simple passcodes
-- **Session persistence**: Admin status is saved in browser localStorage for 4 hours
-- **Multiple admin support**: Up to 3 different admin passcodes for different roles
+- **Session persistence**: Admin status is saved in browser localStorage for 48 hours
+- **Single admin passcode**: One simple passcode for all authorized users
 - **Easy revocation**: Passcodes can be changed instantly by updating the code
 
 ### 🎯 Protected Operations
@@ -18,24 +18,22 @@ All these operations now require admin access:
 - **Tournament management**: Advancing phases, generating random scores, resetting
 - **Quick score buttons**: 21-0, 0-21, 21-19 shortcuts
 
-### 🔑 Admin Passcodes (for tournament day)
+### 🔑 Admin Passcode (for tournament day)
 ```
-july4admin   - Main tournament organizer
-score2024    - For scorekeepers and volunteers  
-official24   - For tournament officials
+july4admin   - Tournament admin passcode
 ```
 
 ## How to Use
 
 ### For Tournament Organizers
-1. **Share passcodes**: Give admin passcodes to trusted scorekeepers before the tournament
+1. **Share passcode**: Give the admin passcode to trusted scorekeepers before the tournament
 2. **Monitor admin access**: See who is logged in as admin in the top-right corner
-3. **Change passcodes if needed**: Update `hooks/use-admin.ts` if access needs to be revoked
+3. **Change passcode if needed**: Update `hooks/use-admin.ts` if access needs to be revoked
 
 ### For Scorekeepers
 1. **Login**: Click the admin login card in the top-right corner
-2. **Enter credentials**: Provide your name and one of the admin passcodes
-3. **Keep session active**: Admin status lasts 4 hours, then you'll need to re-login
+2. **Enter credentials**: Provide your name and the admin passcode
+3. **Keep session active**: Admin status lasts 48 hours, then you'll need to re-login
 4. **Score matches**: Edit buttons will now work for updating match scores
 
 ### For Players/Spectators
@@ -56,7 +54,7 @@ official24   - For tournament officials
 - Live score updates as admins make changes
 
 ### 🔒 Security Features
-- **Session timeout**: Auto-logout after 4 hours
+- **Session timeout**: Auto-logout after 48 hours
 - **Client-side only**: Admin state stored locally, not in database
 - **Easy reset**: Tournament organizer can change passcodes anytime
 - **No permanent accounts**: No user management needed
@@ -101,7 +99,7 @@ const someAdminFunction = async () => {
 ## Emergency Procedures
 
 ### If someone unauthorized gets admin access:
-1. **Change passcodes**: Update `hooks/use-admin.ts` and redeploy
+1. **Change passcode**: Update `hooks/use-admin.ts` and redeploy
 2. **Have all admins re-login**: Old sessions will become invalid
 3. **Check recent changes**: Review match scores for any suspicious updates
 
@@ -109,7 +107,7 @@ const someAdminFunction = async () => {
 1. **Verify passcode**: Check spelling and capitalization
 2. **Clear browser data**: Try incognito/private browsing mode  
 3. **Check console**: Browser dev tools may show connection issues
-4. **Use backup passcode**: Try the other admin passcodes
+4. **Restart browser**: Close and reopen browser to clear any cached issues
 
 ## Future Enhancements
 
