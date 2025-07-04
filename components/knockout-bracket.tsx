@@ -367,25 +367,25 @@ export default function KnockoutBracket({ matches, poolPlayMatches, updateMatch,
     const seedNumber = getSeedNumber(team)
 
     return (
-      <div className="border-4 border-yellow-400 rounded-lg p-4 min-w-[300px] bg-gradient-to-br from-yellow-50 via-white to-yellow-100 shadow-lg">
+      <div className="border-4 border-blue-400 rounded-lg p-4 min-w-[300px] bg-gradient-to-br from-blue-50 via-white to-blue-100 shadow-lg">
         <div className="text-center space-y-3">
           <div className="text-2xl">🎯</div>
           <div>
-            <div className="text-sm font-bold text-yellow-800 mb-1">BYE ROUND</div>
+            <div className="text-sm font-bold text-blue-800 mb-1">BYE ROUND</div>
             <div className="space-y-2">
               <div className="flex items-center justify-center gap-2">
-                <Badge variant="outline" className="text-xs px-2 py-1 bg-yellow-100 border-yellow-400 text-yellow-800">
+                <Badge variant="outline" className="text-xs px-2 py-1 bg-blue-100 border-blue-400 text-blue-800">
                   #{seedNumber}
                 </Badge>
-                <div className="font-semibold text-base text-yellow-900">{team.name}</div>
+                <div className="font-semibold text-base text-blue-900">{team.name}</div>
               </div>
-              <div className="text-xs text-yellow-700">{team.players?.join(" & ")}</div>
+              <div className="text-xs text-blue-700">{team.players?.join(" & ")}</div>
             </div>
           </div>
-          <div className="text-sm font-semibold text-yellow-800 bg-yellow-200 px-3 py-1 rounded-full">
+          <div className="text-sm font-semibold text-blue-800 bg-blue-200 px-3 py-1 rounded-full">
             ✅ Auto-Advance
           </div>
-          <div className="text-xs text-yellow-700">Advances to next round automatically</div>
+          <div className="text-xs text-blue-700">Advances to next round automatically</div>
         </div>
       </div>
     )
@@ -602,8 +602,8 @@ export default function KnockoutBracket({ matches, poolPlayMatches, updateMatch,
 
               {/* Score Validation Message */}
               {team1Score !== "" && team2Score !== "" && team1Score === team2Score && (
-                <div className="text-center p-3 bg-yellow-100 border border-yellow-300 rounded-lg">
-                  <p className="text-sm font-medium text-yellow-800">⚠️ Knockout games cannot end in a tie</p>
+                <div className="text-center p-3 bg-red-100 border border-red-300 rounded-lg">
+                  <p className="text-sm font-medium text-red-800">⚠️ Knockout games cannot end in a tie</p>
                 </div>
               )}
             </div>
@@ -736,7 +736,7 @@ export default function KnockoutBracket({ matches, poolPlayMatches, updateMatch,
 
       {/* Champion Display */}
       {champion && (
-        <Card className="border-4 border-yellow-400 bg-gradient-to-r from-yellow-50 via-white to-yellow-50 shadow-2xl">
+        <Card className="border-4 border-yellow-600 bg-gradient-to-r from-yellow-50 via-white to-yellow-50 shadow-2xl">
           <CardContent className="pt-6">
             <div className="text-center space-y-4">
               <div className="flex justify-center items-center gap-2">
@@ -768,13 +768,13 @@ export default function KnockoutBracket({ matches, poolPlayMatches, updateMatch,
             {byeTeams.length > 0 && (
               <div className="flex flex-col items-center space-y-4">
                 <div className="text-center mb-4">
-                  <h3 className="text-lg font-bold text-yellow-900 bg-gradient-to-r from-yellow-100 to-yellow-200 px-4 py-2 rounded-lg border-2 border-yellow-400">
+                  <h3 className="text-lg font-bold text-blue-900 bg-gradient-to-r from-blue-100 to-blue-200 px-4 py-2 rounded-lg border-2 border-blue-400">
                     Bye Round
                   </h3>
-                  <p className="text-sm text-yellow-700 mt-1">
+                  <p className="text-sm text-blue-700 mt-1">
                     {byeTeams.length} {byeTeams.length === 1 ? 'team' : 'teams'} auto-advance
                   </p>
-                  <p className="text-xs text-yellow-600 mt-1">
+                  <p className="text-xs text-blue-600 mt-1">
                     Skip to Round 1 of {roundNumbers.length} rounds
                   </p>
                 </div>

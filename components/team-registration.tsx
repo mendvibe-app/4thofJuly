@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Trash2, Edit2, Users, Wifi } from "lucide-react"
+import { Trash2, Edit2, Users, Wifi, Plus, Crown } from "lucide-react"
 import type { Team } from "@/types/tournament"
 
 interface TeamRegistrationProps {
@@ -130,6 +130,8 @@ export default function TeamRegistration({
   }
 
   const canStartTournament = teams.length >= 4 && teams.length <= 16
+  const paidTeams = teams.filter(team => team.paid)
+  const unpaidTeams = teams.filter(team => !team.paid)
 
   const generateRandomTeams = async (numTeams: number) => {
     const teamNames = [
@@ -242,17 +244,19 @@ export default function TeamRegistration({
   return (
     <div className="space-y-6">
       {/* Add Team Form */}
-      <Card className="bg-white border-0 shadow-sm">
+      <Card className="tournament-card">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-gray-900">
-            <Users className="w-5 h-5 text-emerald-600" />
+          <CardTitle className="flex items-center gap-3 text-slate-900 outdoor-text-large">
+            <div className="p-2 usa-button-gradient rounded-xl text-white">
+              <Plus className="w-6 h-6" />
+            </div>
             {editingTeam ? "Edit Team" : "Add New Team"}
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 gap-4">
+        <CardContent className="space-y-6">
+          <div className="space-y-4">
             <div>
-              <Label htmlFor="teamName" className="text-sm font-medium text-gray-900">
+              <Label htmlFor="teamName" className="outdoor-text text-slate-900 font-semibold">
                 Team Name
               </Label>
               <Input
@@ -260,12 +264,12 @@ export default function TeamRegistration({
                 value={teamName}
                 onChange={(e) => setTeamName(e.target.value)}
                 placeholder="Enter team name"
-                className="h-11 mt-1"
+                className="touch-target mt-2 text-lg"
                 disabled={isSubmitting}
               />
             </div>
             <div>
-              <Label htmlFor="player1" className="text-sm font-medium text-gray-900">
+              <Label htmlFor="player1" className="outdoor-text text-slate-900 font-semibold">
                 Player 1
               </Label>
               <Input
@@ -273,12 +277,12 @@ export default function TeamRegistration({
                 value={player1}
                 onChange={(e) => setPlayer1(e.target.value)}
                 placeholder="Player 1 name"
-                className="h-11 mt-1"
+                className="touch-target mt-2 text-lg"
                 disabled={isSubmitting}
               />
             </div>
             <div>
-              <Label htmlFor="player2" className="text-sm font-medium text-gray-900">
+              <Label htmlFor="player2" className="outdoor-text text-slate-900 font-semibold">
                 Player 2
               </Label>
               <Input
@@ -286,16 +290,16 @@ export default function TeamRegistration({
                 value={player2}
                 onChange={(e) => setPlayer2(e.target.value)}
                 placeholder="Player 2 name"
-                className="h-11 mt-1"
+                className="touch-target mt-2 text-lg"
                 disabled={isSubmitting}
               />
             </div>
           </div>
-          <div className="flex flex-col sm:flex-row gap-2">
+          <div className="flex flex-col sm:flex-row gap-4">
             <Button
               onClick={editingTeam ? handleUpdateTeam : handleAddTeam}
               disabled={!teamName.trim() || !player1.trim() || !player2.trim() || isSubmitting}
-              className="flag-gradient h-12 font-semibold w-full sm:w-auto transition-all duration-200"
+              className="usa-button-gradient touch-target font-bold outdoor-text flex-1"
             >
               {isSubmitting ? "Saving..." : editingTeam ? "Update Team" : "Add Team"}
             </Button>
@@ -304,7 +308,7 @@ export default function TeamRegistration({
                 variant="outline"
                 onClick={resetForm}
                 disabled={isSubmitting}
-                className="border-gray-300 text-gray-700 hover:bg-gray-50 h-12 w-full sm:w-auto bg-transparent"
+                className="touch-target outdoor-text border-slate-300 text-slate-700 hover:bg-slate-50 flex-1"
               >
                 Cancel
               </Button>
@@ -314,17 +318,22 @@ export default function TeamRegistration({
       </Card>
 
       {/* Testing Section */}
-      <Card className="bg-amber-50 border-amber-200 shadow-sm">
+      <Card className="tournament-card">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-amber-900">Testing Tools</CardTitle>
+                      <CardTitle className="flex items-center gap-3 text-slate-900 outdoor-text-large">
+              <div className="p-2 bg-blue-500 rounded-xl text-white">
+                <Users className="w-6 h-6" />
+              </div>
+              Testing Tools
+            </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
             <Button
               onClick={() => generateRandomTeams(4)}
               variant="outline"
               disabled={isSubmitting}
-              className="border-amber-300 text-amber-700 hover:bg-amber-100 h-11 font-medium bg-transparent"
+              className="touch-target outdoor-text border-slate-300 text-slate-700 hover:bg-slate-100 font-medium"
             >
               4 Teams
             </Button>
@@ -332,7 +341,7 @@ export default function TeamRegistration({
               onClick={() => generateRandomTeams(6)}
               variant="outline"
               disabled={isSubmitting}
-              className="border-amber-300 text-amber-700 hover:bg-amber-100 h-11 font-medium bg-transparent"
+              className="touch-target outdoor-text border-slate-300 text-slate-700 hover:bg-slate-100 font-medium"
             >
               6 Teams
             </Button>
@@ -340,7 +349,7 @@ export default function TeamRegistration({
               onClick={() => generateRandomTeams(8)}
               variant="outline"
               disabled={isSubmitting}
-              className="border-amber-300 text-amber-700 hover:bg-amber-100 h-11 font-medium bg-transparent"
+              className="touch-target outdoor-text border-slate-300 text-slate-700 hover:bg-slate-100 font-medium"
             >
               8 Teams
             </Button>
@@ -348,7 +357,7 @@ export default function TeamRegistration({
               onClick={() => generateRandomTeams(9)}
               variant="outline"
               disabled={isSubmitting}
-              className="border-yellow-400 text-yellow-700 hover:bg-yellow-100 h-11 font-medium bg-transparent font-bold"
+              className="touch-target outdoor-text border-blue-400 text-blue-700 hover:bg-blue-100 font-bold"
             >
               9 Teams 👋
             </Button>
@@ -356,12 +365,12 @@ export default function TeamRegistration({
               onClick={() => generateRandomTeams(12)}
               variant="outline"
               disabled={isSubmitting}
-              className="border-amber-300 text-amber-700 hover:bg-amber-100 h-11 font-medium bg-transparent"
+              className="touch-target outdoor-text border-slate-300 text-slate-700 hover:bg-slate-100 font-medium"
             >
               12 Teams
             </Button>
           </div>
-          <p className="text-sm text-amber-800 text-center">
+          <p className="outdoor-text text-slate-600 text-center font-medium">
             {isSubmitting ? "Generating teams..." : "Generate random teams with fake names for testing"}
           </p>
         </CardContent>
@@ -369,60 +378,80 @@ export default function TeamRegistration({
 
       {/* Teams List */}
       {teams.length > 0 && (
-        <Card className="bg-white border-0 shadow-sm">
+        <Card className="tournament-card">
           <CardHeader>
-            <CardTitle className="text-gray-900">Registered Teams ({teams.length})</CardTitle>
+            <CardTitle className="flex items-center justify-between text-slate-900 outdoor-text-large">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-500 rounded-xl text-white">
+                  <Users className="w-6 h-6" />
+                </div>
+                Registered Teams ({teams.length})
+              </div>
+              <div className="flex gap-2">
+                <Badge className="bg-green-100 text-green-800 px-3 py-1">
+                  {paidTeams.length} paid
+                </Badge>
+                {unpaidTeams.length > 0 && (
+                                  <Badge className="bg-orange-100 text-orange-800 px-3 py-1">
+                  {unpaidTeams.length} unpaid
+                </Badge>
+                )}
+              </div>
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 gap-4">
+            <div className="space-y-4">
               {teams.map((team) => (
-                <div key={team.id} className="team-card">
+                <div key={team.id} className={`team-card ${team.paid ? 'paid' : 'unpaid'}`}>
                   <div className="flex items-start justify-between">
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-lg text-gray-900 truncate">{team.name}</h3>
-                      <p className="text-sm text-gray-600 break-words">{team.players.join(" & ")}</p>
+                      <h3 className="outdoor-text-large font-bold text-slate-900 truncate">{team.name}</h3>
+                      <p className="outdoor-text text-slate-600 break-words">{team.players.join(" & ")}</p>
                     </div>
-                    <div className="flex gap-2 ml-2">
+                    <div className="flex gap-2 ml-4">
                       <Button
                         size="sm"
                         variant="outline"
                         onClick={() => editTeam(team)}
                         disabled={isSubmitting}
-                        className="border-gray-300 text-gray-700 hover:bg-gray-50 h-10 w-10 p-0"
+                        className="touch-target border-slate-300 text-slate-700 hover:bg-slate-50"
                       >
-                        <Edit2 className="w-4 h-4" />
+                        <Edit2 className="w-5 h-5" />
                       </Button>
                       <Button
                         size="sm"
                         variant="outline"
                         onClick={() => handleDeleteTeam(team.id)}
                         disabled={isSubmitting}
-                        className="border-red-300 text-red-700 hover:bg-red-50 h-10 w-10 p-0 bg-transparent"
+                        className="touch-target border-red-300 text-red-700 hover:bg-red-50"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-5 h-5" />
                       </Button>
                     </div>
                   </div>
-                  <div className="flex items-center justify-between pt-3">
-                    <div className="flex items-center space-x-3">
-                      <Checkbox
-                        id={`payment-${team.id}`}
-                        checked={team.paid}
-                        onCheckedChange={() => handleTogglePayment(team)}
-                        disabled={isSubmitting}
-                        className="w-5 h-5"
-                      />
-                      <Label htmlFor={`payment-${team.id}`} className="text-sm font-medium text-gray-900">
-                        Paid $40
-                      </Label>
+                  <div className="flex items-center justify-between pt-4">
+                    <div className="flex items-center space-x-4">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`payment-${team.id}`}
+                          checked={team.paid}
+                          onCheckedChange={() => handleTogglePayment(team)}
+                          disabled={isSubmitting}
+                          className="w-6 h-6"
+                        />
+                        <Label htmlFor={`payment-${team.id}`} className="outdoor-text text-slate-900 font-semibold">
+                          Paid $40
+                        </Label>
+                      </div>
                     </div>
                     <Badge
-                      variant={team.paid ? "default" : "secondary"}
-                      className={`text-sm px-3 py-1 ${
-                        team.paid ? "bg-emerald-100 text-emerald-800 border-emerald-200" : "bg-gray-100 text-gray-600"
+                      className={`outdoor-text px-4 py-2 font-bold ${
+                        team.paid 
+                          ? "bg-green-500 text-white" 
+                          : "bg-orange-500 text-white"
                       }`}
                     >
-                      {team.paid ? "Paid" : "Unpaid"}
+                      {team.paid ? "✅ Paid" : "⏳ Unpaid"}
                     </Badge>
                   </div>
                 </div>
@@ -434,16 +463,29 @@ export default function TeamRegistration({
 
       {/* Tournament Start */}
       {teams.length > 0 && (
-        <Card className="bg-white border-0 shadow-sm">
-          <CardContent className="pt-6">
-            <div className="text-center space-y-4">
-              {!canStartTournament && (
-                <p className="text-amber-600 font-medium">
-                  {teams.length < 4
-                    ? `Need at least 4 teams to start tournament (currently ${teams.length})`
-                    : `Maximum 16 teams allowed (currently ${teams.length})`}
-                </p>
-              )}
+        <Card className="tournament-card bg-gradient-to-r from-blue-50/20 to-red-50/20 border-red-200/50">
+          <CardContent className="p-8">
+            <div className="text-center space-y-6">
+              <div className="space-y-2">
+                {!canStartTournament && (
+                  <div className="p-4 bg-orange-100 rounded-xl border border-orange-200">
+                    <p className="outdoor-text-large text-orange-800 font-bold">
+                      {teams.length < 4
+                        ? `Need at least 4 teams to start tournament (currently ${teams.length})`
+                        : `Maximum 16 teams allowed (currently ${teams.length})`}
+                    </p>
+                  </div>
+                )}
+                
+                {canStartTournament && (
+                  <div className="p-4 bg-green-100 rounded-xl border border-green-200">
+                    <p className="outdoor-text-large text-green-800 font-bold">
+                      🎉 Ready to start tournament with {teams.length} teams!
+                    </p>
+                  </div>
+                )}
+              </div>
+              
               <Button
                 onClick={async () => {
                   try {
@@ -455,11 +497,19 @@ export default function TeamRegistration({
                 }}
                 disabled={!canStartTournament || isSubmitting}
                 size="lg"
-                className="flag-gradient h-14 px-8 font-bold text-lg transition-all duration-200"
+                className="usa-button-gradient touch-target px-12 py-6 font-black text-xl"
               >
-                {isSubmitting ? "Starting..." : `Start Tournament (${teams.length} teams)`}
+                {isSubmitting ? "Starting..." : (
+                  <div className="flex items-center gap-3">
+                    <Crown className="w-8 h-8" />
+                    Start Tournament ({teams.length} teams)
+                  </div>
+                )}
               </Button>
-              <p className="text-sm text-gray-600 font-medium">Set games per team in the next step</p>
+              
+              <p className="outdoor-text text-slate-600 font-medium">
+                Set games per team in the next step
+              </p>
             </div>
           </CardContent>
         </Card>

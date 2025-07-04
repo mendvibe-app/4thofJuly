@@ -66,9 +66,9 @@ export default function Standings({ teams, matches, showTitle = true }: Standing
   }
 
   const getPositionBadge = (position: number, totalTeams: number) => {
-    if (position === 1) return { text: "1st Place", color: "bg-yellow-500 text-white" }
+    if (position === 1) return { text: "1st Place", color: "bg-yellow-600 text-white" }
     if (position === 2) return { text: "2nd Place", color: "bg-gray-400 text-white" }
-    if (position === 3) return { text: "3rd Place", color: "bg-amber-600 text-white" }
+    if (position === 3) return { text: "3rd Place", color: "bg-orange-600 text-white" }
     if (position === totalTeams) return { text: "Last Place", color: "bg-red-500 text-white" }
     return { text: `${position}th Place`, color: "bg-blue-500 text-white" }
   }
@@ -148,7 +148,7 @@ export default function Standings({ teams, matches, showTitle = true }: Standing
                           : position === 2
                             ? "bg-gradient-to-r from-gray-50 to-gray-100"
                             : position === 3
-                              ? "bg-gradient-to-r from-amber-50 to-amber-100"
+                              ? "bg-gradient-to-r from-orange-50 to-orange-100"
                               : position === standings.length
                                 ? "bg-gradient-to-r from-red-50 to-red-100"
                                 : ""
@@ -216,9 +216,9 @@ export default function Standings({ teams, matches, showTitle = true }: Standing
                 <span className="text-2xl">💪</span>
                 <span className="font-semibold text-gray-800">2nd Place</span>
               </div>
-              <div className="flex items-center justify-center gap-2 p-2 bg-amber-100 rounded-lg border border-amber-300">
+              <div className="flex items-center justify-center gap-2 p-2 bg-orange-100 rounded-lg border border-orange-300">
                 <span className="text-2xl">👏</span>
-                <span className="font-semibold text-amber-800">3rd Place</span>
+                <span className="font-semibold text-orange-800">3rd Place</span>
               </div>
               <div className="flex items-center justify-center gap-2 p-2 bg-red-100 rounded-lg border border-red-300">
                 <span className="text-2xl">🍻</span>

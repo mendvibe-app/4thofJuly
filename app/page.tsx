@@ -1,17 +1,38 @@
 "use client"
 
+import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Users, Trophy, DollarSign, Play, Wifi, WifiOff, AlertCircle, Radio } from "lucide-react"
+
+import { 
+  Users, 
+  Trophy, 
+  DollarSign, 
+  Play, 
+  Wifi, 
+  WifiOff, 
+  AlertCircle, 
+  Radio,
+  Home,
+  Settings,
+  BarChart3,
+  Flag,
+  Menu,
+  X,
+      Shield,
+    LogOut
+} from "lucide-react"
 import TeamRegistration from "@/components/team-registration"
 import PoolPlay from "@/components/pool-play"
 import KnockoutBracket from "@/components/knockout-bracket"
 import NCAABracket from "@/components/ncaa-bracket"
-import AdminLogin from "@/components/admin-login"
 import { useTournamentData } from "@/hooks/use-tournament-data"
+import { useAdmin } from "@/hooks/use-admin"
 
 export default function TournamentApp() {
+  const [showMobileMenu, setShowMobileMenu] = useState(false)
+  
   const {
     teams,
     poolPlayMatches,
@@ -31,6 +52,13 @@ export default function TournamentApp() {
     setByeTeamId,
     resetTournament,
   } = useTournamentData()
+
+  const { isAdmin, adminName: currentAdminName, logoutAdmin } = useAdmin()
+
+  const handleAdminLogout = () => {
+    logoutAdmin()
+    setShowMobileMenu(false)
+  }
 
   const totalRevenue = teams.filter((team) => team.paid).length * 40
   const paidTeams = teams.filter((team) => team.paid).length
@@ -87,247 +115,358 @@ export default function TournamentApp() {
     }
   }
 
-  const getConnectionIcon = () => {
-    switch (connectionStatus) {
-      case "connected":
-        return <Wifi className="w-6 h-6 text-green-600" />
-      case "error":
-        return <WifiOff className="w-6 h-6 text-red-600" />
+  const getPhaseIcon = () => {
+    switch (currentPhase) {
+      case "registration":
+        return <Users className="w-6 h-6" />
+      case "pool-play":
+        return <Play className="w-6 h-6" />
+      case "knockout":
+        return <Trophy className="w-6 h-6" />
       default:
-        return <AlertCircle className="w-6 h-6 text-yellow-600" />
+        return <Flag className="w-6 h-6" />
     }
   }
 
-  const getConnectionText = () => {
+  const getConnectionStatus = () => {
+    const baseClasses = "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all duration-300 border-2 shadow-lg"
+    
     switch (connectionStatus) {
       case "connected":
-        return realtimeConnected ? "🔴 LIVE Tournament - Real-time Updates Active!" : "🔴 LIVE Tournament - Everyone Can Participate!"
+        return (
+          <div className={`${baseClasses} bg-green-400 text-white border-white animate-pulse`}>
+            <Radio className="w-3 h-3" />
+            <span>LIVE</span>
+          </div>
+        )
       case "error":
-        return "❌ Database Connection Error - Check Console"
+        return (
+          <div className={`${baseClasses} bg-red-500 text-white border-white`}>
+            <WifiOff className="w-3 h-3" />
+            <span>OFFLINE</span>
+          </div>
+        )
       default:
-        return "🔄 Connecting to Database..."
+        return (
+          <div className={`${baseClasses} bg-blue-400 text-white border-white animate-pulse`}>
+            <AlertCircle className="w-3 h-3" />
+            <span>CONNECTING</span>
+          </div>
+        )
     }
   }
 
-  const getRealtimeStatus = () => {
-    if (realtimeConnected) {
-      return (
-        <Badge className="bg-green-100 text-green-800 border-green-300">
-          <Radio className="w-3 h-3 mr-1" />
-          Real-time Active
-        </Badge>
-      )
-    } else if (isPolling) {
-      return (
-        <Badge className="bg-blue-100 text-blue-800 border-blue-300">
-          <AlertCircle className="w-3 h-3 mr-1" />
-          Polling Active
-        </Badge>
-      )
-    } else {
-      return (
-        <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300">
-          <AlertCircle className="w-3 h-3 mr-1" />
-          Connecting...
-        </Badge>
-      )
+  const navigationItems = [
+    { 
+      id: "registration", 
+      label: "Teams", 
+      icon: Users,
+      disabled: false,
+      badge: teams.length > 0 ? teams.length : null
+    },
+    { 
+      id: "pool-play", 
+      label: "Pool Play", 
+      icon: Play,
+      disabled: teams.length < 4,
+      badge: poolPlayMatches.length > 0 ? poolPlayMatches.length : null
+    },
+    { 
+      id: "knockout", 
+      label: "Knockout", 
+      icon: Trophy,
+      disabled: poolPlayMatches.length === 0,
+      badge: knockoutMatches.length > 0 ? knockoutMatches.length : null
     }
-  }
+  ]
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <div className="text-6xl animate-spin">⚽</div>
-          <h2 className="text-2xl font-bold text-gray-900">Loading Tournament...</h2>
-          <p className="text-gray-600">Connecting to live data</p>
-          <div className="text-sm text-blue-600">Check browser console for connection details</div>
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+        <div className="text-center space-y-6">
+          <div className="text-8xl animate-spin">⚽</div>
+          <div className="space-y-2">
+            <h2 className="text-3xl font-black text-white">Loading Tournament</h2>
+            <p className="text-xl text-slate-300">Connecting to live data...</p>
+          </div>
+          <div className="w-16 h-2 bg-slate-700 rounded-full overflow-hidden">
+            <div className="w-full h-full bg-red-500 animate-pulse" />
+          </div>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-4xl mx-auto px-4 py-6">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl sm:text-4xl font-bold mb-2 text-red-600">
-            4th of July Invitational
-          </h1>
-          <h2 className="text-2xl sm:text-3xl font-bold mb-2 text-white" style={{ textShadow: '2px 2px 0px #000000, -2px -2px 0px #000000, 2px -2px 0px #000000, -2px 2px 0px #000000' }}>
-            16th Annual
-          </h2>
-          <p className="text-blue-600 font-medium text-lg">Harbor Way Soccer Tennis Tournament</p>
-        </div>
-
-        {/* Connection Status */}
-        <Card className="mb-6 border-2 border-blue-200 bg-gradient-to-r from-blue-50 to-green-50">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                {getConnectionIcon()}
-                <div>
-                  <p className="font-semibold text-gray-900">{getConnectionText()}</p>
-                  <p className="text-sm text-gray-600">
-                    {connectionStatus === "connected" ? "Data synced automatically" : "Checking connection..."}
-                  </p>
-                </div>
-              </div>
+    <div className="min-h-screen bg-slate-900">
+      {/* Redesigned Header - Better Layout */}
+      <header className="sticky-header usa-header-gradient">
+        <div className="safe-area-top">
+          <div className="px-4 py-4">
+            {/* Top Row - Connection Status and Menu */}
+            <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
-                {getRealtimeStatus()}
-                {realtimeConnected && (
-                  <div className="flex items-center gap-1 text-green-600">
-                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                    <span className="text-sm font-medium">Live</span>
-                  </div>
+                {getConnectionStatus()}
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowMobileMenu(!showMobileMenu)}
+                className="touch-target p-3 text-white hover:bg-white/20 rounded-xl"
+              >
+                {showMobileMenu ? (
+                  <X className="w-6 h-6" />
+                ) : (
+                  <Menu className="w-6 h-6" />
                 )}
-              </div>
+              </Button>
             </div>
-          </CardContent>
-        </Card>
+            
+            {/* Main Title Section */}
+            <div className="text-center space-y-1">
+              <div className="flex items-center justify-center gap-2 mb-1">
+                <span className="text-2xl">🇺🇸</span>
+                <h1 className="text-2xl sm:text-3xl font-black text-white leading-tight">
+                  4th of July Invitational
+                </h1>
+                <span className="text-2xl">🇺🇸</span>
+              </div>
+              <p className="text-sm sm:text-base font-semibold text-white/90">
+                16th Annual • Harbor Way Soccer Tennis
+              </p>
+            </div>
+          </div>
+        </div>
+      </header>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
-          <Card className="bg-white border-0 shadow-sm">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-emerald-100 rounded-lg">
-                  <Users className="w-5 h-5 text-emerald-600" />
+      {/* Mobile Menu Overlay */}
+      {showMobileMenu && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" onClick={() => setShowMobileMenu(false)}>
+          <div className="fixed top-0 right-0 h-full w-80 bg-white shadow-xl p-6 safe-area-top">
+            <div className="flex items-center justify-between mb-8">
+              <h3 className="text-xl font-bold text-slate-900">Menu</h3>
+              <Button variant="ghost" size="sm" onClick={() => setShowMobileMenu(false)}>
+                <X className="w-6 h-6" />
+              </Button>
+            </div>
+            
+            <div className="space-y-4">
+              <Button
+                onClick={() => window.open("/standings", "_blank")}
+                variant="outline"
+                className="w-full justify-start h-14 outdoor-text"
+              >
+                <BarChart3 className="w-5 h-5 mr-3" />
+                Standings
+              </Button>
+              
+              <Button
+                onClick={() => window.open("/rules", "_blank")}
+                variant="outline"
+                className="w-full justify-start h-14 outdoor-text"
+              >
+                <Flag className="w-5 h-5 mr-3" />
+                Rules
+              </Button>
+              
+              {isAdmin ? (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg border border-green-200">
+                    <Shield className="w-5 h-5 text-green-600" />
+                    <div className="flex-1">
+                      <p className="font-medium text-green-900">Admin Mode</p>
+                      <p className="text-sm text-green-700">{currentAdminName}</p>
+                    </div>
+                  </div>
+                  
+                  <Button
+                    onClick={handleAdminLogout}
+                    variant="outline"
+                    className="w-full justify-start h-14 outdoor-text border-red-300 text-red-700 hover:bg-red-50"
+                  >
+                    <LogOut className="w-5 h-5 mr-3" />
+                    Logout Admin
+                  </Button>
                 </div>
+              ) : (
+                <Button
+                  onClick={() => {
+                    setShowMobileMenu(false)
+                    window.open("/admin", "_blank")
+                  }}
+                  variant="outline"
+                  className="w-full justify-start h-14 outdoor-text"
+                >
+                  <Shield className="w-5 h-5 mr-3" />
+                  Admin Login
+                </Button>
+              )}
+              
+              <Button
+                variant="outline"
+                onClick={resetTournament}
+                className="w-full justify-start h-14 outdoor-text border-red-300 text-red-700 hover:bg-red-50"
+              >
+                <Settings className="w-5 h-5 mr-3" />
+                Reset Tournament
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tournament Stats Dashboard */}
+      <div className="px-4 py-6 pb-24 space-y-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card className="tournament-card">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600 font-medium">Teams</p>
-                  <p className="text-2xl font-bold text-gray-900">{teams.length}</p>
+                  <p className="outdoor-text text-slate-600 font-medium">Teams</p>
+                  <p className="text-4xl font-black text-slate-900">{teams.length}</p>
+                </div>
+                <div className="p-3 bg-blue-100 rounded-2xl">
+                  <Users className="w-8 h-8 text-blue-600" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-white border-0 shadow-sm">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <DollarSign className="w-5 h-5 text-blue-600" />
-                </div>
+          <Card className="tournament-card">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600 font-medium">Revenue</p>
-                  <p className="text-2xl font-bold text-gray-900">${totalRevenue}</p>
+                  <p className="outdoor-text text-slate-600 font-medium">Revenue</p>
+                  <p className="text-4xl font-black text-slate-900">${totalRevenue}</p>
+                </div>
+                <div className="p-3 bg-green-100 rounded-2xl">
+                  <DollarSign className="w-8 h-8 text-green-600" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-white border-0 shadow-sm">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-amber-100 rounded-lg">
-                  <Trophy className="w-5 h-5 text-amber-600" />
-                </div>
+          <Card className="tournament-card">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600 font-medium">Paid</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {paidTeams}/{teams.length}
+                  <p className="outdoor-text text-slate-600 font-medium">Paid</p>
+                  <p className="text-4xl font-black text-slate-900">
+                    {paidTeams}<span className="text-xl text-slate-500">/{teams.length}</span>
                   </p>
                 </div>
+                <div className="p-3 bg-orange-100 rounded-2xl">
+                  <Trophy className="w-8 h-8 text-orange-600" />
+                </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-white border-0 shadow-sm">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-purple-100 rounded-lg">
-                  <Play className="w-5 h-5 text-purple-600" />
-                </div>
+          <Card className="tournament-card">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600 font-medium">Phase</p>
-                  <Badge variant="outline" className="text-xs border-gray-300 text-gray-700 mt-1">
+                  <p className="outdoor-text text-slate-600 font-medium">Phase</p>
+                  <Badge className="usa-button-gradient text-white border-0 mt-2 px-3 py-1">
                     {currentPhase.replace("-", " ").toUpperCase()}
                   </Badge>
                 </div>
+                <div className="p-3 bg-purple-100 rounded-2xl">
+                  {getPhaseIcon()}
+                </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Admin Login - now positioned fixed in top right */}
-        <AdminLogin />
-
-        {/* Navigation */}
-        <div className="flex flex-col sm:flex-row gap-3 mb-6">
-          <div className="flex flex-wrap gap-2 flex-1">
-            <Button
-              onClick={() => updateTournamentPhase("registration")}
-              className={`flex-1 sm:flex-none h-11 transition-all duration-200 ${
-                currentPhase === "registration"
-                  ? "nav-flag-active"
-                  : "border-gray-300 text-gray-700 hover:bg-gray-50 bg-transparent"
-              }`}
-              variant={currentPhase === "registration" ? "default" : "outline"}
-            >
-              Registration
-            </Button>
-            <Button
-              onClick={() => updateTournamentPhase("pool-play")}
-              disabled={teams.length < 4}
-              className={`flex-1 sm:flex-none h-11 transition-all duration-200 ${
-                currentPhase === "pool-play"
-                  ? "nav-flag-active"
-                  : "border-gray-300 text-gray-700 hover:bg-gray-50 bg-transparent"
-              }`}
-              variant={currentPhase === "pool-play" ? "default" : "outline"}
-            >
-              Pool Play
-            </Button>
-            <Button
-              onClick={() => updateTournamentPhase("knockout")}
-              disabled={poolPlayMatches.length === 0}
-              className={`flex-1 sm:flex-none h-11 transition-all duration-200 ${
-                currentPhase === "knockout"
-                  ? "nav-flag-active"
-                  : "border-gray-300 text-gray-700 hover:bg-gray-50 bg-transparent"
-              }`}
-              variant={currentPhase === "knockout" ? "default" : "outline"}
-            >
-              Knockout
-            </Button>
-            <Button
-              onClick={() => window.open("/standings", "_blank")}
-              variant="outline"
-              className="border-gray-300 text-gray-700 hover:bg-gray-50 h-11 bg-transparent"
-            >
-              Standings
-            </Button>
-            <Button
-              onClick={() => window.open("/rules", "_blank")}
-              variant="outline"
-              className="border-gray-300 text-gray-700 hover:bg-gray-50 h-11 bg-transparent"
-            >
-              Rules
-            </Button>
-          </div>
-          <Button
-            variant="outline"
-            onClick={resetTournament}
-            className="border-red-300 text-red-700 hover:bg-red-50 h-11 w-full sm:w-auto bg-transparent"
-          >
-            Reset Tournament
-          </Button>
-        </div>
-
-        {/* Main Content */}
-        <Card className="bg-white border-0 shadow-sm">
-          <CardHeader className="border-b border-gray-100">
-            <CardTitle className="text-gray-900 text-xl font-semibold">{getPhaseTitle()}</CardTitle>
-            <CardDescription className="text-gray-600">
-              {currentPhase === "registration" && "Add teams and manage registrations"}
-              {currentPhase === "pool-play" && "All teams play each other"}
-              {currentPhase === "knockout" && "Single elimination bracket"}
-            </CardDescription>
+        {/* Current Phase Display */}
+        <Card className="tournament-card">
+          <CardHeader className="border-b border-slate-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 usa-button-gradient rounded-xl text-white">
+                  {getPhaseIcon()}
+                </div>
+                <div>
+                  <CardTitle className="text-2xl font-black text-slate-900">
+                    {getPhaseTitle()}
+                  </CardTitle>
+                  <CardDescription className="outdoor-text text-slate-600">
+                    {currentPhase === "registration" && "Add teams and manage registrations"}
+                    {currentPhase === "pool-play" && "All teams play each other in round-robin"}
+                    {currentPhase === "knockout" && "Single elimination tournament bracket"}
+                  </CardDescription>
+                </div>
+              </div>
+              
+              {connectionStatus === "connected" && realtimeConnected && (
+                <div className="status-live">
+                  <Radio className="w-4 h-4 inline mr-1" />
+                  LIVE
+                </div>
+              )}
+            </div>
           </CardHeader>
-          <CardContent className="p-6">{renderPhaseContent()}</CardContent>
+          <CardContent className="p-6">
+            {renderPhaseContent()}
+          </CardContent>
         </Card>
       </div>
+
+      {/* Redesigned Bottom Navigation - Patriotic Theme */}
+      <nav className="fixed bottom-0 left-0 right-0 z-50 safe-area-bottom">
+        {/* Patriotic gradient background matching header */}
+        <div className="usa-header-gradient border-t-2 border-white/20">
+          <div className="flex px-2 py-3">
+            {navigationItems.map((item) => {
+              const Icon = item.icon
+              const isActive = currentPhase === item.id
+              
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => !item.disabled && updateTournamentPhase(item.id as any)}
+                  disabled={item.disabled}
+                  className={`
+                    flex-1 flex flex-col items-center justify-center
+                    touch-target relative transition-all duration-200
+                    ${isActive 
+                      ? 'text-white transform scale-110' 
+                      : 'text-white/80 hover:text-white'
+                    }
+                    ${item.disabled ? 'opacity-40 cursor-not-allowed' : 'hover:bg-white/10 rounded-xl'}
+                  `}
+                >
+                  <div className="relative">
+                    <Icon className={`w-6 h-6 mb-1 ${isActive ? 'animate-pulse' : ''}`} />
+                    {item.badge && (
+                      <span className="absolute -top-1 -right-1 bg-yellow-400 text-slate-900 text-xs rounded-full w-5 h-5 flex items-center justify-center font-black border-2 border-white shadow-lg">
+                        {item.badge}
+                      </span>
+                    )}
+                  </div>
+                  <span className={`text-xs font-bold ${isActive ? 'text-yellow-300' : ''}`}>
+                    {item.label}
+                  </span>
+                  {isActive && (
+                    <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-yellow-300 rounded-full animate-pulse" />
+                  )}
+                </button>
+              )
+            })}
+            
+            {/* Special Menu Item - Matching Design */}
+            <button
+              onClick={() => setShowMobileMenu(true)}
+              className="flex-1 flex flex-col items-center justify-center touch-target text-white/80 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200"
+            >
+              <Menu className="w-6 h-6 mb-1" />
+              <span className="text-xs font-bold">More</span>
+            </button>
+          </div>
+        </div>
+      </nav>
     </div>
   )
 }
+
