@@ -1,8 +1,9 @@
 "use client"
 
 import type { Match, Team, TournamentPhase } from "@/types/tournament"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { supabase } from "@/lib/supabase"
+import { RealtimeChannel } from "@supabase/supabase-js"
 
 export function useTournamentData() {
   const [teams, setTeams] = useState<Team[]>([])
@@ -12,51 +13,119 @@ export function useTournamentData() {
   const [byeTeam, setByeTeam] = useState<Team | null>(null)
   const [loading, setLoading] = useState(true)
   const [connectionStatus, setConnectionStatus] = useState<"connecting" | "connected" | "error">("connecting")
+  const [realtimeConnected, setRealtimeConnected] = useState(false)
+  const [subscriptions, setSubscriptions] = useState<RealtimeChannel[]>([])
 
   // Load initial data
   useEffect(() => {
     loadTournamentData()
   }, [])
 
-  // Set up real-time subscriptions
+  // Set up real-time subscriptions with enhanced error handling
   useEffect(() => {
+    console.log("🔄 Setting up real-time subscriptions...")
+    
     // Subscribe to teams changes
     const teamsSubscription = supabase
       .channel("teams-changes")
-      .on("postgres_changes", { event: "*", schema: "public", table: "teams" }, (payload) => {
-        console.log("🔄 Teams updated - reloading...", payload)
-        loadTeams()
-      })
-      .subscribe((status) => {
+      .on(
+        "postgres_changes",
+        { 
+          event: "*", 
+          schema: "public", 
+          table: "teams" 
+        },
+        (payload) => {
+          console.log("🔄 Teams updated - reloading...", payload)
+          loadTeams()
+        }
+      )
+      .subscribe((status, err) => {
         console.log("📡 Teams subscription status:", status)
+        if (err) {
+          console.error("❌ Teams subscription error:", err)
+        } else if (status === "SUBSCRIBED") {
+          console.log("✅ Teams real-time subscription active")
+        }
       })
 
     // Subscribe to matches changes
     const matchesSubscription = supabase
       .channel("matches-changes")
-      .on("postgres_changes", { event: "*", schema: "public", table: "matches" }, () => {
-        console.log("🔄 Matches updated - reloading...")
-        loadMatches()
+      .on(
+        "postgres_changes",
+        { 
+          event: "*", 
+          schema: "public", 
+          table: "matches" 
+        },
+        (payload) => {
+          console.log("🔄 Matches updated - reloading...", payload)
+          loadMatches()
+        }
+      )
+      .subscribe((status, err) => {
+        console.log("📡 Matches subscription status:", status)
+        if (err) {
+          console.error("❌ Matches subscription error:", err)
+        } else if (status === "SUBSCRIBED") {
+          console.log("✅ Matches real-time subscription active")
+        }
       })
-      .subscribe()
 
     // Subscribe to tournament settings changes
     const settingsSubscription = supabase
       .channel("settings-changes")
-      .on("postgres_changes", { event: "*", schema: "public", table: "tournament_settings" }, () => {
-        console.log("🔄 Tournament settings updated - reloading...")
-        loadTournamentSettings()
+      .on(
+        "postgres_changes",
+        { 
+          event: "*", 
+          schema: "public", 
+          table: "tournament_settings" 
+        },
+        (payload) => {
+          console.log("🔄 Tournament settings updated - reloading...", payload)
+          loadTournamentSettings()
+        }
+      )
+      .subscribe((status, err) => {
+        console.log("📡 Settings subscription status:", status)
+        if (err) {
+          console.error("❌ Settings subscription error:", err)
+        } else if (status === "SUBSCRIBED") {
+          console.log("✅ Settings real-time subscription active")
+        }
       })
-      .subscribe()
 
+    // Monitor overall real-time connection status
+    const connectionSubscription = supabase
+      .channel("connection-status")
+      .subscribe((status, err) => {
+        console.log("📡 Real-time connection status:", status)
+        if (err) {
+          console.error("❌ Real-time connection error:", err)
+          setRealtimeConnected(false)
+        } else if (status === "SUBSCRIBED") {
+          setRealtimeConnected(true)
+          console.log("✅ Real-time connection established")
+        } else if (status === "CLOSED") {
+          setRealtimeConnected(false)
+          console.log("⚠️ Real-time connection closed")
+        }
+      })
+
+    const allSubscriptions = [teamsSubscription, matchesSubscription, settingsSubscription, connectionSubscription]
+    setSubscriptions(allSubscriptions)
+
+    // Cleanup function
     return () => {
-      teamsSubscription.unsubscribe()
-      matchesSubscription.unsubscribe()
-      settingsSubscription.unsubscribe()
+      console.log("🧹 Cleaning up real-time subscriptions...")
+      allSubscriptions.forEach(sub => sub.unsubscribe())
     }
   }, [])
 
-  const loadTournamentData = async () => {
+  // Enhanced data loading with better error handling
+  const loadTournamentData = useCallback(async () => {
     console.log("🚀 Loading tournament data...")
     setLoading(true)
     setConnectionStatus("connecting")
@@ -71,7 +140,11 @@ export function useTournamentData() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
+
+  // Polling fallback system
+  const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null)
+  const [isPolling, setIsPolling] = useState(false)
 
   const loadTeams = async () => {
     try {
@@ -229,6 +302,52 @@ export function useTournamentData() {
       setByeTeam(null)
     }
   }
+
+  // Polling fallback functions
+  const startPollingFallback = useCallback(() => {
+    if (pollingInterval) return // Already polling
+    
+    console.log("🔄 Starting polling fallback (every 30 seconds)")
+    setIsPolling(true)
+    
+    const interval = setInterval(() => {
+      console.log("📡 Polling for updates...")
+      loadTournamentData()
+    }, 30000) // Poll every 30 seconds
+    
+    setPollingInterval(interval)
+  }, [pollingInterval, loadTournamentData])
+
+  const stopPollingFallback = useCallback(() => {
+    if (pollingInterval) {
+      console.log("🛑 Stopping polling fallback")
+      clearInterval(pollingInterval)
+      setPollingInterval(null)
+      setIsPolling(false)
+    }
+  }, [pollingInterval])
+
+  // Stop polling if real-time connects
+  useEffect(() => {
+    if (realtimeConnected && isPolling) {
+      console.log("✅ Real-time connected, stopping polling fallback")
+      stopPollingFallback()
+    }
+  }, [realtimeConnected, isPolling, stopPollingFallback])
+
+  // Start polling fallback if real-time doesn't connect
+  useEffect(() => {
+    const fallbackTimer = setTimeout(() => {
+      if (!realtimeConnected) {
+        console.log("⚠️ Real-time not connected, starting polling fallback...")
+        startPollingFallback()
+      }
+    }, 10000)
+
+    return () => {
+      clearTimeout(fallbackTimer)
+    }
+  }, [realtimeConnected, startPollingFallback])
 
   const addTeam = async (team: Omit<Team, "id">) => {
     console.log("➕ Adding team:", team.name)
@@ -515,6 +634,9 @@ export function useTournamentData() {
     byeTeam,
     loading,
     connectionStatus,
+    realtimeConnected,
+    subscriptions,
+    isPolling,
     addTeam,
     updateTeam,
     deleteTeam,

@@ -3,7 +3,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Users, Trophy, DollarSign, Play, Wifi, WifiOff, AlertCircle } from "lucide-react"
+import { Users, Trophy, DollarSign, Play, Wifi, WifiOff, AlertCircle, Radio } from "lucide-react"
 import TeamRegistration from "@/components/team-registration"
 import PoolPlay from "@/components/pool-play"
 import KnockoutBracket from "@/components/knockout-bracket"
@@ -19,6 +19,8 @@ export default function TournamentApp() {
     byeTeam,
     loading,
     connectionStatus,
+    realtimeConnected,
+    isPolling,
     addTeam,
     updateTeam,
     deleteTeam,
@@ -98,11 +100,36 @@ export default function TournamentApp() {
   const getConnectionText = () => {
     switch (connectionStatus) {
       case "connected":
-        return "🔴 LIVE Tournament - Everyone Can Participate!"
+        return realtimeConnected ? "🔴 LIVE Tournament - Real-time Updates Active!" : "🔴 LIVE Tournament - Everyone Can Participate!"
       case "error":
         return "❌ Database Connection Error - Check Console"
       default:
         return "🔄 Connecting to Database..."
+    }
+  }
+
+  const getRealtimeStatus = () => {
+    if (realtimeConnected) {
+      return (
+        <Badge className="bg-green-100 text-green-800 border-green-300">
+          <Radio className="w-3 h-3 mr-1" />
+          Real-time Active
+        </Badge>
+      )
+    } else if (isPolling) {
+      return (
+        <Badge className="bg-blue-100 text-blue-800 border-blue-300">
+          <AlertCircle className="w-3 h-3 mr-1" />
+          Polling Active
+        </Badge>
+      )
+    } else {
+      return (
+        <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300">
+          <AlertCircle className="w-3 h-3 mr-1" />
+          Connecting...
+        </Badge>
+      )
     }
   }
 
@@ -132,6 +159,32 @@ export default function TournamentApp() {
           </h2>
           <p className="text-blue-600 font-medium text-lg">Harbor Way Soccer Tennis Tournament</p>
         </div>
+
+        {/* Connection Status */}
+        <Card className="mb-6 border-2 border-blue-200 bg-gradient-to-r from-blue-50 to-green-50">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                {getConnectionIcon()}
+                <div>
+                  <p className="font-semibold text-gray-900">{getConnectionText()}</p>
+                  <p className="text-sm text-gray-600">
+                    {connectionStatus === "connected" ? "Data synced automatically" : "Checking connection..."}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {getRealtimeStatus()}
+                {realtimeConnected && (
+                  <div className="flex items-center gap-1 text-green-600">
+                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                    <span className="text-sm font-medium">Live</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Stats Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
@@ -195,8 +248,6 @@ export default function TournamentApp() {
             </CardContent>
           </Card>
         </div>
-
-
 
         {/* Navigation */}
         <div className="flex flex-col sm:flex-row gap-3 mb-6">
