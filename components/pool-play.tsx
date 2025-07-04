@@ -289,9 +289,26 @@ export default function PoolPlay({
       console.log(`👥 ${allTeams.length} teams advance (NO eliminations)`)
       console.log(`👋 ${byesNeeded} byes awarded to top ${byesNeeded} seeds`)
       
+      // DETAILED SEEDING DEBUG
+      console.log(`📊 Team Seeding:`)
+      allTeams.forEach((team, index) => {
+        console.log(`  #${index + 1}: ${team.name} (${team.wins}W-${team.losses}L, +${team.pointsFor - team.pointsAgainst})`)
+      })
+      
       // Distribute byes to top seeds
       const byeTeams = allTeams.slice(0, byesNeeded)
       const playingTeams = allTeams.slice(byesNeeded)
+      
+      console.log(`👋 Teams with BYES (${byeTeams.length}):`)
+      byeTeams.forEach((team, index) => {
+        console.log(`  #${index + 1}: ${team.name} - BYE`)
+      })
+      
+      console.log(`🥊 Teams PLAYING first round (${playingTeams.length}):`)
+      playingTeams.forEach((team, index) => {
+        const actualSeed = allTeams.findIndex(t => t.id === team.id) + 1
+        console.log(`  #${actualSeed}: ${team.name}`)
+      })
       
       // Set bye teams (for now, just track the #1 seed as primary bye)
       if (byeTeams.length > 0) {
@@ -309,6 +326,8 @@ export default function PoolPlay({
       const knockoutMatches: Omit<Match, "id">[] = []
       const numMatches = Math.floor(playingTeams.length / 2)
 
+      console.log(`🎯 Creating ${numMatches} first round matches from ${playingTeams.length} playing teams:`)
+      
       // Create matches with proper tournament seeding (highest vs lowest remaining)
       for (let i = 0; i < numMatches; i++) {
         const team1 = playingTeams[i]  // Higher seed among playing teams
