@@ -250,10 +250,8 @@ export default function TournamentApp() {
           </Card>
         </div>
 
-        {/* Admin Login */}
-        <div className="flex justify-end mb-6">
-          <AdminLogin />
-        </div>
+        {/* Admin Login - now positioned fixed in top right */}
+        <AdminLogin />
 
         {/* Navigation */}
         <div className="flex flex-col sm:flex-row gap-3 mb-6">
