@@ -5,8 +5,10 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Trophy, Crown } from "lucide-react"
 import type { Match, Team } from "@/types/tournament"
+import { useAdmin } from "@/hooks/use-admin"
 
 interface KnockoutBracketProps {
   matches: Match[]
@@ -18,6 +20,7 @@ interface KnockoutBracketProps {
 }
 
 export default function KnockoutBracket({ matches, poolPlayMatches, updateMatch, createMatches, byeTeam, allTeams }: KnockoutBracketProps) {
+  const { isAdmin } = useAdmin()
   const [editingMatch, setEditingMatch] = useState<Match | null>(null)
   const [team1Score, setTeam1Score] = useState("")
   const [team2Score, setTeam2Score] = useState("")
@@ -672,17 +675,19 @@ export default function KnockoutBracket({ matches, poolPlayMatches, updateMatch,
               </div>
 
               {/* Action Button */}
-              <Button
-                onClick={() => editMatch(match)}
-                className={`w-full min-h-[36px] text-xs font-semibold ${
-                  match.completed
-                    ? "border-blue-300 text-blue-700 hover:bg-blue-50 bg-transparent"
-                    : "bg-red-600 hover:bg-red-700 text-white"
-                }`}
-                variant={match.completed ? "outline" : "default"}
-              >
-                {match.completed ? "✏️ Edit" : "⚽ Enter Score"}
-              </Button>
+              {isAdmin && (
+                <Button
+                  onClick={() => editMatch(match)}
+                  className={`w-full min-h-[36px] text-xs font-semibold ${
+                    match.completed
+                      ? "border-blue-300 text-blue-700 hover:bg-blue-50 bg-transparent"
+                      : "bg-red-600 hover:bg-red-700 text-white"
+                  }`}
+                  variant={match.completed ? "outline" : "default"}
+                >
+                  {match.completed ? "✏️ Edit" : "⚽ Enter Score"}
+                </Button>
+              )}
 
               {/* Status Badge */}
               <div className="text-center">
@@ -699,6 +704,15 @@ export default function KnockoutBracket({ matches, poolPlayMatches, updateMatch,
 
   return (
     <div className="space-y-6">
+      {/* View Mode Notice */}
+      {!isAdmin && matches.length > 0 && (
+        <Alert className="border-blue-300 bg-blue-50">
+          <AlertDescription className="text-blue-800">
+            👀 Viewing bracket in spectator mode. Results update live as tournament admins enter scores.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Header */}
       <div className="text-center mb-6">
         <h2 className="text-2xl font-bold flex items-center justify-center gap-2 bg-gradient-to-r from-red-600 to-blue-600 bg-clip-text text-transparent">
