@@ -8,6 +8,7 @@ import TeamRegistration from "@/components/team-registration"
 import PoolPlay from "@/components/pool-play"
 import KnockoutBracket from "@/components/knockout-bracket"
 import NCAABracket from "@/components/ncaa-bracket"
+import AdminLogin from "@/components/admin-login"
 import { useTournamentData } from "@/hooks/use-tournament-data"
 
 export default function TournamentApp() {
@@ -247,6 +248,11 @@ export default function TournamentApp() {
               </div>
             </CardContent>
           </Card>
+        </div>
+
+        {/* Admin Login */}
+        <div className="flex justify-end mb-6">
+          <AdminLogin />
         </div>
 
         {/* Navigation */}
