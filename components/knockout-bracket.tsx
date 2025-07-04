@@ -342,15 +342,22 @@ export default function KnockoutBracket({ matches, poolPlayMatches, updateMatch,
   }, [matches, byeTeams])
 
   // Score update handler (Supabase version)
-  const updateMatchScore = async () => {
+  const updateMatchScore = async (completeGame: boolean = false) => {
     if (!editingMatch || team1Score === "" || team2Score === "") return
     const score1 = Number.parseInt(team1Score)
     const score2 = Number.parseInt(team2Score)
-    if (isNaN(score1) || isNaN(score2) || score1 < 0 || score2 < 0 || score1 === score2) return
+    if (isNaN(score1) || isNaN(score2) || score1 < 0 || score2 < 0) return
+    
+    // If completing the game, ensure scores aren't tied
+    if (completeGame && score1 === score2) {
+      alert("Knockout games cannot end in a tie! Please adjust the scores.")
+      return
+    }
+    
     await updateMatch(editingMatch.id, {
       team1Score: score1,
       team2Score: score2,
-      completed: true,
+      completed: completeGame,
     })
     setEditingMatch(null)
     setTeam1Score("")
@@ -585,11 +592,18 @@ export default function KnockoutBracket({ matches, poolPlayMatches, updateMatch,
               {/* Action Buttons - Mobile Optimized */}
               <div className="flex flex-col gap-3 pt-2">
                 <Button
-                  onClick={updateMatchScore}
+                  onClick={() => updateMatchScore(false)}
+                  disabled={team1Score === "" || team2Score === ""}
+                  className="w-full h-14 text-lg bg-blue-600 hover:bg-blue-700 font-bold rounded-xl"
+                >
+                  💾 Save Score
+                </Button>
+                <Button
+                  onClick={() => updateMatchScore(true)}
                   disabled={team1Score === "" || team2Score === "" || team1Score === team2Score}
                   className="w-full h-14 text-lg bg-green-600 hover:bg-green-700 font-bold rounded-xl"
                 >
-                  💾 Save Score
+                  🏁 Complete Game
                 </Button>
                 <Button
                   variant="outline"

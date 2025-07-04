@@ -18,6 +18,7 @@ interface PoolPlayProps {
   createMatches: (matches: Omit<Match, "id">[]) => Promise<void>
   onAdvanceToKnockout: () => void
   setByeTeamId: (teamId: number | null) => Promise<void>
+  resetTournament?: () => Promise<void>
 }
 
 export default function PoolPlay({
@@ -27,6 +28,7 @@ export default function PoolPlay({
   createMatches,
   onAdvanceToKnockout,
   setByeTeamId,
+  resetTournament,
 }: PoolPlayProps) {
   const { isAdmin } = useAdmin()
   const [gamesPerTeam, setGamesPerTeam] = useState(3)
@@ -372,7 +374,7 @@ export default function PoolPlay({
     }
   }
 
-  const handleScoreUpdate = async (matchId: number) => {
+  const handleScoreUpdate = async (matchId: number, completeGame: boolean = false) => {
     const t1Score = Number.parseInt(team1Score) || 0
     const t2Score = Number.parseInt(team2Score) || 0
 
@@ -381,11 +383,17 @@ export default function PoolPlay({
       return
     }
 
+    // If completing the game, ensure scores aren't tied
+    if (completeGame && t1Score === t2Score) {
+      alert("Games cannot end in a tie! Please adjust the scores.")
+      return
+    }
+
     try {
       await updateMatch(matchId, {
         team1Score: t1Score,
         team2Score: t2Score,
-        completed: true,
+        completed: completeGame,
       })
 
       setEditingMatch(null)
@@ -583,7 +591,7 @@ export default function PoolPlay({
             <CardTitle className="flex items-center gap-2 text-slate-900">Admin Testing Tools</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <Button
                 onClick={generateRandomScores}
                 variant="outline"
@@ -609,6 +617,16 @@ export default function PoolPlay({
                 <Zap className="w-4 h-4 mr-2" />
                 Quick Bracket
               </Button>
+              {resetTournament && (
+                <Button
+                  onClick={resetTournament}
+                  variant="outline"
+                  className="border-red-300 text-red-700 hover:bg-red-50 h-11 font-medium bg-transparent"
+                >
+                  <Settings className="w-4 h-4 mr-2" />
+                  Reset Tournament
+                </Button>
+              )}
             </div>
             <p className="text-sm text-slate-800 text-center">Testing tools for quick tournament simulation</p>
           </CardContent>
@@ -750,17 +768,55 @@ export default function PoolPlay({
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {matches.map((match) => (
-                <div
-                  key={match.id}
-                  className={`p-4 rounded-lg border-2 transition-all duration-200 ${
-                    match.completed
-                      ? "border-green-200 bg-green-50"
-                      : editingMatch === match.id
-                        ? "border-blue-300 bg-blue-50"
-                        : "border-gray-200 bg-gray-50"
-                  }`}
-                >
+              {(() => {
+                // Sort matches: incomplete first (by creation order), then completed at bottom
+                const incompleteMatches = matches.filter(match => !match.completed).sort((a, b) => a.id - b.id)
+                const completedMatches = matches.filter(match => match.completed).sort((a, b) => a.id - b.id)
+                const sortedMatches = [...incompleteMatches, ...completedMatches]
+                
+                return sortedMatches.map((match, index) => {
+                  // Calculate permanent match number based on creation order (consistent numbering)
+                  const allMatchesByCreation = matches.sort((a, b) => a.id - b.id)
+                  const matchNumber = allMatchesByCreation.findIndex(m => m.id === match.id) + 1
+                  
+                  return (
+                                  <div
+                    key={match.id}
+                    className={`p-4 rounded-lg border-2 transition-all duration-200 ${
+                      match.completed
+                        ? "border-green-200 bg-green-50"
+                        : editingMatch === match.id
+                          ? "border-blue-300 bg-blue-50"
+                          : "border-gray-200 bg-gray-50"
+                    }`}
+                  >
+                    {/* Match Number Header */}
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <Badge 
+                          className={`font-bold ${
+                            match.completed 
+                              ? "bg-green-100 text-green-800 border-green-200" 
+                              : "bg-blue-100 text-blue-800 border-blue-200"
+                          }`}
+                        >
+                          Match {matchNumber}
+                        </Badge>
+                        {match.completed && (
+                          <Badge className="bg-green-100 text-green-800 border-green-200">
+                            <Target className="w-3 h-3 mr-1" />
+                            Completed
+                          </Badge>
+                        )}
+                      </div>
+                      {/* Show live indicator for matches with partial scores */}
+                      {!match.completed && (match.team1Score > 0 || match.team2Score > 0) && (
+                        <div className="flex items-center gap-1">
+                          <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                          <span className="text-xs font-bold text-red-600">LIVE</span>
+                        </div>
+                      )}
+                    </div>
                   {editingMatch === match.id ? (
                     <div className="space-y-4">
                       {/* Team 1 Score Entry - Mobile Optimized */}
@@ -909,11 +965,18 @@ export default function PoolPlay({
                       {/* Action Buttons - Mobile Optimized */}
                       <div className="flex flex-col gap-3 pt-2">
                         <Button
-                          onClick={() => handleScoreUpdate(match.id)}
+                          onClick={() => handleScoreUpdate(match.id, false)}
+                          disabled={team1Score === "" || team2Score === ""}
+                          className="w-full h-14 text-lg bg-blue-600 hover:bg-blue-700 font-bold rounded-xl"
+                        >
+                          💾 Save Score
+                        </Button>
+                        <Button
+                          onClick={() => handleScoreUpdate(match.id, true)}
                           disabled={team1Score === "" || team2Score === "" || team1Score === team2Score}
                           className="w-full h-14 text-lg bg-green-600 hover:bg-green-700 font-bold rounded-xl"
                         >
-                          💾 Save Score
+                          🏁 Complete Game
                         </Button>
                         <Button
                           variant="outline"
@@ -979,17 +1042,10 @@ export default function PoolPlay({
                       )}
                     </div>
                   )}
-
-                  {match.completed && (
-                    <div className="mt-2 text-center">
-                      <Badge className="bg-green-100 text-green-800 border-green-200">
-                        <Target className="w-3 h-3 mr-1" />
-                        Completed
-                      </Badge>
-                    </div>
-                  )}
                 </div>
-              ))}
+                  )
+                })
+              })()}
             </div>
           </CardContent>
         </Card>
