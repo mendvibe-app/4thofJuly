@@ -227,11 +227,11 @@ export default function TournamentApp() {
             {/* Main Title Section */}
             <div className="text-center space-y-1">
               <div className="flex items-center justify-center gap-2 mb-1">
-                <span className="text-2xl">🇺🇸</span>
+                <span className="text-2xl">🦅</span>
                 <h1 className="text-2xl sm:text-3xl font-black text-white leading-tight">
                   4th of July Invitational
                 </h1>
-                <span className="text-2xl">🇺🇸</span>
+                <span className="text-2xl">🍺</span>
               </div>
               <p className="text-sm sm:text-base font-semibold text-white/90">
                 16th Annual • Harbor Way Soccer Tennis
