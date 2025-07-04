@@ -5,9 +5,8 @@ import { useAdmin } from '@/hooks/use-admin'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Settings, LogOut, Shield, User } from 'lucide-react'
 
 export default function AdminLogin() {
   const { isAdmin, adminName, loginAsAdmin, logoutAdmin } = useAdmin()
@@ -15,6 +14,7 @@ export default function AdminLogin() {
   const [name, setName] = useState('')
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [isOpen, setIsOpen] = useState(false)
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -22,7 +22,7 @@ export default function AdminLogin() {
     setIsLoading(true)
 
     if (!passcode.trim()) {
-      setError('Please enter an admin passcode')
+      setError('Please enter passcode')
       setIsLoading(false)
       return
     }
@@ -35,11 +35,12 @@ export default function AdminLogin() {
 
     const success = loginAsAdmin(passcode, name)
     if (!success) {
-      setError('Invalid admin passcode')
+      setError('Invalid passcode')
       setPasscode('')
     } else {
       setPasscode('')
       setName('')
+      setIsOpen(false)
     }
     setIsLoading(false)
   }
@@ -49,103 +50,121 @@ export default function AdminLogin() {
     setPasscode('')
     setName('')
     setError('')
+    setIsOpen(false)
   }
 
   if (isAdmin) {
     return (
-      <Card className="w-full max-w-sm">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <span className="text-green-600">🔐</span>
-            Admin Mode
-          </CardTitle>
-          <CardDescription>
-            You are logged in as an admin
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <Badge variant="secondary" className="bg-green-100 text-green-800 border-green-300">
-                {adminName}
-              </Badge>
-            </div>
+      <div className="fixed top-4 right-4 z-50">
+        <Popover open={isOpen} onOpenChange={setIsOpen}>
+          <PopoverTrigger asChild>
             <Button 
-              onClick={handleLogout}
-              variant="outline"
+              variant="outline" 
               size="sm"
-              className="text-red-600 border-red-300 hover:bg-red-50"
+              className="bg-green-50 border-green-200 hover:bg-green-100 text-green-700 shadow-sm"
             >
-              Logout
+              <Shield className="w-4 h-4 mr-1" />
+              <span className="hidden sm:inline">Admin</span>
             </Button>
-          </div>
-          
-          <Alert>
-            <AlertDescription className="text-sm">
-              ✅ You can now edit scores and manage the tournament
-            </AlertDescription>
-          </Alert>
-        </CardContent>
-      </Card>
+          </PopoverTrigger>
+          <PopoverContent className="w-64" align="end">
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 pb-2 border-b">
+                <Shield className="w-4 h-4 text-green-600" />
+                <span className="font-medium text-green-700">Admin Mode</span>
+              </div>
+              
+              <div className="flex items-center gap-2 text-sm">
+                <User className="w-4 h-4 text-gray-500" />
+                <span className="text-gray-700">{adminName}</span>
+              </div>
+              
+              <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded">
+                ✅ Score editing enabled
+              </div>
+              
+              <Button 
+                onClick={handleLogout}
+                variant="outline"
+                size="sm"
+                className="w-full text-red-600 border-red-200 hover:bg-red-50"
+              >
+                <LogOut className="w-4 h-4 mr-1" />
+                Logout
+              </Button>
+            </div>
+          </PopoverContent>
+        </Popover>
+      </div>
     )
   }
 
   return (
-    <Card className="w-full max-w-sm">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-lg flex items-center gap-2">
-          <span className="text-yellow-600">🔒</span>
-          Admin Login
-        </CardTitle>
-        <CardDescription>
-          Enter admin passcode to edit scores
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleLogin} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="admin-name">Your Name</Label>
-            <Input
-              id="admin-name"
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Enter your name"
-              className="border-gray-300"
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="admin-passcode">Admin Passcode</Label>
-            <Input
-              id="admin-passcode"
-              type="password"
-              value={passcode}
-              onChange={(e) => setPasscode(e.target.value)}
-              placeholder="Enter admin passcode"
-              className="border-gray-300"
-            />
-          </div>
-
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-
+    <div className="fixed top-4 right-4 z-50">
+      <Popover open={isOpen} onOpenChange={setIsOpen}>
+        <PopoverTrigger asChild>
           <Button 
-            type="submit" 
-            className="w-full"
-            disabled={isLoading}
+            variant="outline" 
+            size="sm"
+            className="bg-gray-50 border-gray-200 hover:bg-gray-100 text-gray-600 shadow-sm"
           >
-            {isLoading ? 'Logging in...' : 'Login as Admin'}
+            <Settings className="w-4 h-4 mr-1" />
+            <span className="hidden sm:inline">Admin</span>
           </Button>
-        </form>
-        
-        <div className="mt-4 text-xs text-gray-500 text-center">
-          <p>Contact tournament organizer for admin access</p>
-        </div>
-      </CardContent>
-    </Card>
+        </PopoverTrigger>
+        <PopoverContent className="w-72" align="end">
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 pb-2 border-b">
+              <Settings className="w-4 h-4 text-gray-600" />
+              <span className="font-medium text-gray-700">Admin Login</span>
+            </div>
+            
+            <form onSubmit={handleLogin} className="space-y-3">
+              <div className="space-y-1">
+                <Label htmlFor="admin-name" className="text-sm">Your Name</Label>
+                <Input
+                  id="admin-name"
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Enter your name"
+                  className="h-8 text-sm"
+                />
+              </div>
+              
+              <div className="space-y-1">
+                <Label htmlFor="admin-passcode" className="text-sm">Passcode</Label>
+                <Input
+                  id="admin-passcode"
+                  type="password"
+                  value={passcode}
+                  onChange={(e) => setPasscode(e.target.value)}
+                  placeholder="Enter passcode"
+                  className="h-8 text-sm"
+                />
+              </div>
+
+              {error && (
+                <div className="text-xs text-red-600 bg-red-50 p-2 rounded">
+                  {error}
+                </div>
+              )}
+
+              <Button 
+                type="submit" 
+                className="w-full h-8 text-sm"
+                disabled={isLoading}
+              >
+                {isLoading ? 'Logging in...' : 'Login'}
+              </Button>
+            </form>
+            
+            <div className="text-xs text-gray-500 text-center pt-2 border-t">
+              Contact tournament organizer for access
+            </div>
+          </div>
+        </PopoverContent>
+      </Popover>
+    </div>
   )
 } 
