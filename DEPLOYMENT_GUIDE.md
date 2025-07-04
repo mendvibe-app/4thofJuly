@@ -74,22 +74,20 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 
 ## Admin System - Production Notes
 
-### Admin Passcodes
-The admin system uses these passcodes (you can change them in `hooks/use-admin.ts`):
+### Admin Passcode
+The admin system uses this passcode (you can change it in `hooks/use-admin.ts`):
 - `july4admin`
-- `score2024`
-- `official24`
 
 ### Security Features
-- ✅ 4-hour session timeout
+- ✅ 48-hour session timeout
 - ✅ Client-side only (no database storage)
-- ✅ Multiple admin support
+- ✅ Multiple users can use same passcode
 - ✅ Easy passcode rotation
 
 ### Production Checklist
 - [ ] Environment variables configured
 - [ ] Supabase database tables created
-- [ ] Admin passcodes communicated to tournament staff
+- [ ] Admin passcode communicated to tournament staff
 - [ ] Real-time subscriptions enabled in Supabase
 - [ ] Test admin login on production site
 - [ ] Test score updates with admin access
