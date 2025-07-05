@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Trash2, Edit2, Users, Wifi, Plus, Crown } from "lucide-react"
+import { Trash2, Edit2, Users, Wifi, Plus, Crown, Shield } from "lucide-react"
 import type { Team } from "@/types/tournament"
 import { useAdmin } from "@/hooks/use-admin"
 
@@ -245,138 +245,160 @@ export default function TeamRegistration({
 
   return (
     <div className="space-y-6">
-      {/* Add Team Form */}
-      <Card className="tournament-card">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-3 text-slate-900 outdoor-text-large">
-            <div className="p-2 usa-button-gradient rounded-xl text-white">
-              <Plus className="w-6 h-6" />
+      {/* Admin-only notice for non-admin users */}
+      {!isAdmin && (
+        <Card className="tournament-card bg-amber-50 border-amber-200">
+          <CardContent className="p-6">
+            <div className="flex items-center gap-3 text-amber-800">
+              <Shield className="w-6 h-6" />
+              <div>
+                <h3 className="font-semibold text-lg">Admin Access Required</h3>
+                <p className="text-sm mt-1">
+                  Team registration is restricted to tournament administrators to protect the current tournament. 
+                  Please contact an admin to add or modify teams.
+                </p>
+              </div>
             </div>
-            {editingTeam ? "Edit Team" : "Add New Team"}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="teamName" className="outdoor-text text-slate-900 font-semibold">
-                Team Name
-              </Label>
-              <Input
-                id="teamName"
-                value={teamName}
-                onChange={(e) => setTeamName(e.target.value)}
-                placeholder="Enter team name"
-                className="touch-target mt-2 text-lg"
-                disabled={isSubmitting}
-              />
-            </div>
-            <div>
-              <Label htmlFor="player1" className="outdoor-text text-slate-900 font-semibold">
-                Player 1
-              </Label>
-              <Input
-                id="player1"
-                value={player1}
-                onChange={(e) => setPlayer1(e.target.value)}
-                placeholder="Player 1 name"
-                className="touch-target mt-2 text-lg"
-                disabled={isSubmitting}
-              />
-            </div>
-            <div>
-              <Label htmlFor="player2" className="outdoor-text text-slate-900 font-semibold">
-                Player 2
-              </Label>
-              <Input
-                id="player2"
-                value={player2}
-                onChange={(e) => setPlayer2(e.target.value)}
-                placeholder="Player 2 name"
-                className="touch-target mt-2 text-lg"
-                disabled={isSubmitting}
-              />
-            </div>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-4">
-            <Button
-              onClick={editingTeam ? handleUpdateTeam : handleAddTeam}
-              disabled={!teamName.trim() || !player1.trim() || !player2.trim() || isSubmitting}
-              className="usa-button-gradient touch-target font-bold outdoor-text flex-1"
-            >
-              {isSubmitting ? "Saving..." : editingTeam ? "Update Team" : "Add Team"}
-            </Button>
-            {editingTeam && (
-              <Button
-                variant="outline"
-                onClick={resetForm}
-                disabled={isSubmitting}
-                className="touch-target outdoor-text border-slate-300 text-slate-700 hover:bg-slate-50 flex-1"
-              >
-                Cancel
-              </Button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
-      {/* Testing Section */}
-      <Card className="tournament-card">
-        <CardHeader>
-                      <CardTitle className="flex items-center gap-3 text-slate-900 outdoor-text-large">
+      {/* Add Team Form - Admin Only */}
+      {isAdmin && (
+        <Card className="tournament-card">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-3 text-slate-900 outdoor-text-large">
+              <div className="p-2 usa-button-gradient rounded-xl text-white">
+                <Plus className="w-6 h-6" />
+              </div>
+              {editingTeam ? "Edit Team" : "Add New Team"}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="teamName" className="outdoor-text text-slate-900 font-semibold">
+                  Team Name
+                </Label>
+                <Input
+                  id="teamName"
+                  value={teamName}
+                  onChange={(e) => setTeamName(e.target.value)}
+                  placeholder="Enter team name"
+                  className="touch-target mt-2 text-lg"
+                  disabled={isSubmitting}
+                />
+              </div>
+              <div>
+                <Label htmlFor="player1" className="outdoor-text text-slate-900 font-semibold">
+                  Player 1
+                </Label>
+                <Input
+                  id="player1"
+                  value={player1}
+                  onChange={(e) => setPlayer1(e.target.value)}
+                  placeholder="Player 1 name"
+                  className="touch-target mt-2 text-lg"
+                  disabled={isSubmitting}
+                />
+              </div>
+              <div>
+                <Label htmlFor="player2" className="outdoor-text text-slate-900 font-semibold">
+                  Player 2
+                </Label>
+                <Input
+                  id="player2"
+                  value={player2}
+                  onChange={(e) => setPlayer2(e.target.value)}
+                  placeholder="Player 2 name"
+                  className="touch-target mt-2 text-lg"
+                  disabled={isSubmitting}
+                />
+              </div>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-4">
+              <Button
+                onClick={editingTeam ? handleUpdateTeam : handleAddTeam}
+                disabled={!teamName.trim() || !player1.trim() || !player2.trim() || isSubmitting}
+                className="usa-button-gradient touch-target font-bold outdoor-text flex-1"
+              >
+                {isSubmitting ? "Saving..." : editingTeam ? "Update Team" : "Add Team"}
+              </Button>
+              {editingTeam && (
+                <Button
+                  variant="outline"
+                  onClick={resetForm}
+                  disabled={isSubmitting}
+                  className="touch-target outdoor-text border-slate-300 text-slate-700 hover:bg-slate-50 flex-1"
+                >
+                  Cancel
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Testing Section - Admin Only */}
+      {isAdmin && (
+        <Card className="tournament-card">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-3 text-slate-900 outdoor-text-large">
               <div className="p-2 bg-blue-500 rounded-xl text-white">
                 <Users className="w-6 h-6" />
               </div>
               Testing Tools
             </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-            <Button
-              onClick={() => generateRandomTeams(4)}
-              variant="outline"
-              disabled={isSubmitting}
-              className="touch-target outdoor-text border-slate-300 text-slate-700 hover:bg-slate-100 font-medium"
-            >
-              4 Teams
-            </Button>
-            <Button
-              onClick={() => generateRandomTeams(6)}
-              variant="outline"
-              disabled={isSubmitting}
-              className="touch-target outdoor-text border-slate-300 text-slate-700 hover:bg-slate-100 font-medium"
-            >
-              6 Teams
-            </Button>
-            <Button
-              onClick={() => generateRandomTeams(8)}
-              variant="outline"
-              disabled={isSubmitting}
-              className="touch-target outdoor-text border-slate-300 text-slate-700 hover:bg-slate-100 font-medium"
-            >
-              8 Teams
-            </Button>
-            <Button
-              onClick={() => generateRandomTeams(9)}
-              variant="outline"
-              disabled={isSubmitting}
-              className="touch-target outdoor-text border-blue-400 text-blue-700 hover:bg-blue-100 font-bold"
-            >
-              9 Teams 👋
-            </Button>
-            <Button
-              onClick={() => generateRandomTeams(12)}
-              variant="outline"
-              disabled={isSubmitting}
-              className="touch-target outdoor-text border-slate-300 text-slate-700 hover:bg-slate-100 font-medium"
-            >
-              12 Teams
-            </Button>
-          </div>
-          <p className="outdoor-text text-slate-600 text-center font-medium">
-            {isSubmitting ? "Generating teams..." : "Generate random teams with fake names for testing"}
-          </p>
-        </CardContent>
-      </Card>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+              <Button
+                onClick={() => generateRandomTeams(4)}
+                variant="outline"
+                disabled={isSubmitting}
+                className="touch-target outdoor-text border-slate-300 text-slate-700 hover:bg-slate-100 font-medium"
+              >
+                4 Teams
+              </Button>
+              <Button
+                onClick={() => generateRandomTeams(6)}
+                variant="outline"
+                disabled={isSubmitting}
+                className="touch-target outdoor-text border-slate-300 text-slate-700 hover:bg-slate-100 font-medium"
+              >
+                6 Teams
+              </Button>
+              <Button
+                onClick={() => generateRandomTeams(8)}
+                variant="outline"
+                disabled={isSubmitting}
+                className="touch-target outdoor-text border-slate-300 text-slate-700 hover:bg-slate-100 font-medium"
+              >
+                8 Teams
+              </Button>
+              <Button
+                onClick={() => generateRandomTeams(9)}
+                variant="outline"
+                disabled={isSubmitting}
+                className="touch-target outdoor-text border-blue-400 text-blue-700 hover:bg-blue-100 font-bold"
+              >
+                9 Teams 👋
+              </Button>
+              <Button
+                onClick={() => generateRandomTeams(12)}
+                variant="outline"
+                disabled={isSubmitting}
+                className="touch-target outdoor-text border-slate-300 text-slate-700 hover:bg-slate-100 font-medium"
+              >
+                12 Teams
+              </Button>
+            </div>
+            <p className="outdoor-text text-slate-600 text-center font-medium">
+              {isSubmitting ? "Generating teams..." : "Generate random teams with fake names for testing"}
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Teams List */}
       {teams.length > 0 && (
@@ -394,9 +416,9 @@ export default function TeamRegistration({
                   {paidTeams.length} paid
                 </Badge>
                 {unpaidTeams.length > 0 && (
-                                  <Badge className="bg-orange-100 text-orange-800 px-3 py-1">
-                  {unpaidTeams.length} unpaid
-                </Badge>
+                  <Badge className="bg-orange-100 text-orange-800 px-3 py-1">
+                    {unpaidTeams.length} unpaid
+                  </Badge>
                 )}
               </div>
             </CardTitle>
@@ -410,28 +432,31 @@ export default function TeamRegistration({
                       <h3 className="outdoor-text-large font-bold text-slate-900 truncate">{team.name}</h3>
                       <p className="outdoor-text text-slate-600 break-words">{team.players.join(" & ")}</p>
                     </div>
-                    <div className="flex gap-2 ml-4">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => editTeam(team)}
-                        disabled={isSubmitting}
-                        className="touch-target border-slate-300 text-slate-700 hover:bg-slate-50"
-                      >
-                        <Edit2 className="w-5 h-5" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleDeleteTeam(team.id)}
-                        disabled={isSubmitting}
-                        className="touch-target border-red-300 text-red-700 hover:bg-red-50"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </Button>
-                    </div>
+                    {isAdmin && (
+                      <div className="flex gap-2 ml-4">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => editTeam(team)}
+                          disabled={isSubmitting}
+                          className="touch-target border-slate-300 text-slate-700 hover:bg-slate-50"
+                        >
+                          <Edit2 className="w-5 h-5" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleDeleteTeam(team.id)}
+                          disabled={isSubmitting}
+                          className="touch-target border-red-300 text-red-700 hover:bg-red-50"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
-                  <div className="flex items-center justify-between pt-4">
+                  
+                  <div className="mt-4 flex items-center justify-between">
                     <div className="flex items-center space-x-4">
                       <div className="flex items-center space-x-2">
                         <Checkbox
@@ -464,7 +489,7 @@ export default function TeamRegistration({
       )}
 
       {/* Tournament Start - Admin Only */}
-      {isAdmin && teams.length > 0 && (
+      {isAdmin && (
         <Card className="tournament-card bg-gradient-to-r from-blue-50/20 to-red-50/20 border-red-200/50">
           <CardContent className="p-6">
             <div className="text-center space-y-4">
