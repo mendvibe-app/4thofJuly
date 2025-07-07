@@ -159,46 +159,69 @@ export default function PoolPlay({
         if (!matchCreated) break
       }
       
-      // Phase 2: Fill remaining games for teams that still need more
-      const teamsStillNeedingGames = teams.filter(team => 
-        (tempGameCount.get(team.id) || 0) < targetGames
-      )
+      // Phase 2: Ensure ALL teams get AT LEAST the target number of games
+      let additionalMatchesNeeded = true
+      let safetyCounter = 0
       
-      for (const team of teamsStillNeedingGames) {
-        const currentGames = tempGameCount.get(team.id) || 0
-        const gamesNeeded = targetGames - currentGames
+      while (additionalMatchesNeeded && safetyCounter < 50) {
+        safetyCounter++
+        additionalMatchesNeeded = false
         
-        const potentialOpponents = teams.filter(opponent => {
-          if (opponent.id === team.id) return false
-          
-          // BUG FIX: Check if opponent would exceed their game limit
-          const opponentCurrentGames = tempGameCount.get(opponent.id) || 0
-          if (opponentCurrentGames >= targetGames) return false
-          
-          const alreadyPlayed = matches.some(match => 
-            (match.team1.id === team.id && match.team2.id === opponent.id) ||
-            (match.team1.id === opponent.id && match.team2.id === team.id)
-          ) || allNeededMatches.some(match => 
-            (match.team1.id === team.id && match.team2.id === opponent.id) ||
-            (match.team1.id === opponent.id && match.team2.id === team.id)
-          )
-          return !alreadyPlayed
-        }).sort(() => Math.random() - 0.5)
+        // Find teams that still need more games to reach the minimum
+        const teamsNeedingGames = teams.filter(team => 
+          (tempGameCount.get(team.id) || 0) < targetGames
+        ).sort(() => Math.random() - 0.5) // Randomize order for fairness
         
-        for (let i = 0; i < Math.min(gamesNeeded, potentialOpponents.length); i++) {
-          const opponent = potentialOpponents[i]
+        if (teamsNeedingGames.length === 0) break
+        
+        console.log(`🔄 Phase 2 iteration ${safetyCounter}: ${teamsNeedingGames.length} teams still need games`)
+        
+        for (const team of teamsNeedingGames) {
+          const currentGames = tempGameCount.get(team.id) || 0
+          const gamesNeeded = targetGames - currentGames
           
-          // Double-check opponent won't exceed limit (extra safety)
-          const opponentCurrentGames = tempGameCount.get(opponent.id) || 0
-          if (opponentCurrentGames >= targetGames) {
-            console.warn(`⚠️ Skipping match for ${team.name} vs ${opponent.name} - opponent already at limit (${opponentCurrentGames}/${targetGames})`)
+          if (gamesNeeded <= 0) continue
+          
+          // Find ALL available opponents (not just those under the limit)
+          const potentialOpponents = teams.filter(opponent => {
+            if (opponent.id === team.id) return false
+            
+            const alreadyPlayed = matches.some(match => 
+              (match.team1.id === team.id && match.team2.id === opponent.id) ||
+              (match.team1.id === opponent.id && match.team2.id === team.id)
+            ) || allNeededMatches.some(match => 
+              (match.team1.id === team.id && match.team2.id === opponent.id) ||
+              (match.team1.id === opponent.id && match.team2.id === team.id)
+            )
+            return !alreadyPlayed
+          }).sort((a, b) => {
+            // Prioritize opponents with fewer games to balance distribution
+            const aGames = tempGameCount.get(a.id) || 0
+            const bGames = tempGameCount.get(b.id) || 0
+            return aGames - bGames
+          })
+          
+          if (potentialOpponents.length === 0) {
+            console.warn(`⚠️ No available opponents for ${team.name} (${currentGames}/${targetGames} games)`)
             continue
           }
           
-          allNeededMatches.push({team1: team, team2: opponent})
-          tempGameCount.set(team.id, (tempGameCount.get(team.id) || 0) + 1)
-          tempGameCount.set(opponent.id, (tempGameCount.get(opponent.id) || 0) + 1)
+          // Add games for this team until they reach the minimum
+          for (let i = 0; i < Math.min(gamesNeeded, potentialOpponents.length); i++) {
+            const opponent = potentialOpponents[i]
+            
+            allNeededMatches.push({team1: team, team2: opponent})
+            tempGameCount.set(team.id, (tempGameCount.get(team.id) || 0) + 1)
+            tempGameCount.set(opponent.id, (tempGameCount.get(opponent.id) || 0) + 1)
+            
+            console.log(`➕ Added match: ${team.name} vs ${opponent.name} (${team.name}: ${tempGameCount.get(team.id)}, ${opponent.name}: ${tempGameCount.get(opponent.id)})`)
+            additionalMatchesNeeded = true
+          }
         }
+      }
+      
+      if (safetyCounter >= 50) {
+        console.warn(`⚠️ Safety limit reached in Phase 2 - some teams may have fewer than ${targetGames} games`)
       }
       
       console.log(`📋 Generated ${allNeededMatches.length} total matches. Now creating optimal schedule...`)
@@ -212,7 +235,7 @@ export default function PoolPlay({
       while (remainingMatches.length > 0) {
         console.log(`📅 Scheduling round ${round}...`)
         
-        // Find the best match for this round (teams that haven't played recently)
+        // Find the best match for this round with enhanced anti-back-to-back logic
         let bestMatch: {team1: Team, team2: Team} | null = null
         let bestScore = -1
         let bestIndex = -1
@@ -222,10 +245,24 @@ export default function PoolPlay({
           const team1LastRound = teamLastPlayedRound.get(match.team1.id) || 0
           const team2LastRound = teamLastPlayedRound.get(match.team2.id) || 0
           
-          // Score = how many rounds since each team last played (higher is better)
+          // Calculate rest periods (how many rounds since last played)
           const team1Rest = round - team1LastRound
           const team2Rest = round - team2LastRound
-          const matchScore = team1Rest + team2Rest
+          
+          // Base score: favor teams that haven't played recently
+          let matchScore = team1Rest + team2Rest
+          
+          // ENHANCED SCORING: Heavily penalize back-to-back games
+          if (team1LastRound === round - 1) matchScore -= 100 // Team1 played last round
+          if (team2LastRound === round - 1) matchScore -= 100 // Team2 played last round
+          
+          // Bonus for teams that haven't played in 2+ rounds
+          if (team1Rest >= 2) matchScore += 50
+          if (team2Rest >= 2) matchScore += 50
+          
+          // Extra bonus for teams that haven't played in 3+ rounds
+          if (team1Rest >= 3) matchScore += 100
+          if (team2Rest >= 3) matchScore += 100
           
           if (matchScore > bestScore) {
             bestScore = matchScore
@@ -235,6 +272,11 @@ export default function PoolPlay({
         }
         
         if (bestMatch) {
+          const team1LastRound = teamLastPlayedRound.get(bestMatch.team1.id) || 0
+          const team2LastRound = teamLastPlayedRound.get(bestMatch.team2.id) || 0
+          const team1Rest = round - team1LastRound
+          const team2Rest = round - team2LastRound
+          
           // Schedule this match
           scheduledMatches.push({
             team1: bestMatch.team1,
@@ -253,7 +295,13 @@ export default function PoolPlay({
           // Remove this match from remaining matches
           remainingMatches.splice(bestIndex, 1)
           
-          console.log(`   Game ${round}: ${bestMatch.team1.name} vs ${bestMatch.team2.name} (rest: ${round - (teamLastPlayedRound.get(bestMatch.team1.id) || 0) + 1}/${round - (teamLastPlayedRound.get(bestMatch.team2.id) || 0) + 1})`)
+          // Enhanced logging with rest period info
+          const restInfo = `${bestMatch.team1.name}(+${team1Rest}) vs ${bestMatch.team2.name}(+${team2Rest})`
+          console.log(`   Game ${round}: ${restInfo}`)
+          
+          // Warning for back-to-back games
+          if (team1Rest === 1) console.warn(`   ⚠️ ${bestMatch.team1.name} playing back-to-back!`)
+          if (team2Rest === 1) console.warn(`   ⚠️ ${bestMatch.team2.name} playing back-to-back!`)
           
           round++
         } else {
@@ -276,22 +324,32 @@ export default function PoolPlay({
       
       console.log(`📊 Final games per team:`, finalGameCounts)
       
-      // Check for teams exceeding target
-      const teamsExceedingLimit = teams.filter(t => {
+      // Check for teams below minimum target
+      const teamsBelowMinimum = teams.filter(t => {
         const count = scheduledMatches.filter(m => m.team1.id === t.id || m.team2.id === t.id).length + 
                      matches.filter(m => m.team1.id === t.id || m.team2.id === t.id).length
-        return count > targetGames
+        return count < targetGames
       })
       
-      if (teamsExceedingLimit.length > 0) {
-        console.error(`❌ BUG DETECTED: Teams exceeding ${targetGames} game limit:`, 
-          teamsExceedingLimit.map(t => `${t.name}: ${finalGameCounts[t.name]} games`)
+      if (teamsBelowMinimum.length > 0) {
+        console.error(`❌ BUG DETECTED: Teams below minimum ${targetGames} games:`, 
+          teamsBelowMinimum.map(t => `${t.name}: ${finalGameCounts[t.name]} games`)
         )
-        alert(`Error: Some teams would exceed the ${targetGames} game limit. Please contact the admin.`)
+        alert(`Error: Some teams would have fewer than ${targetGames} games. Please contact the admin.`)
         return
       }
       
-      console.log(`✅ Validation passed: All teams within ${targetGames} game limit`)
+      // Show distribution summary
+      const gameDistribution = teams.reduce((acc, t) => {
+        const count = finalGameCounts[t.name]
+        acc[count] = (acc[count] || 0) + 1
+        return acc
+      }, {} as Record<number, number>)
+      
+      console.log(`✅ Validation passed: All teams have at least ${targetGames} games`)
+      console.log(`📊 Game distribution:`, Object.entries(gameDistribution).map(([games, teams]) => 
+        `${teams} team${teams === 1 ? '' : 's'} with ${games} game${games === '1' ? '' : 's'}`
+      ).join(', '))
       
       // Show schedule preview
       console.log(`📅 Game Schedule Preview:`)
@@ -653,7 +711,7 @@ export default function PoolPlay({
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center gap-4">
-              <label className="text-sm font-medium text-gray-900">Games per team:</label>
+              <label className="text-sm font-medium text-gray-900">Minimum games per team:</label>
               <Input
                 type="number"
                 min="1"
@@ -662,7 +720,10 @@ export default function PoolPlay({
                 onChange={(e) => setGamesPerTeam(Number.parseInt(e.target.value) || 1)}
                 className="w-20 h-10"
               />
-              <span className="text-sm text-gray-600">(max {teams.length - 1} vs all other teams)</span>
+              <span className="text-sm text-gray-600">(all teams get at least this many games)</span>
+            </div>
+            <div className="text-sm text-blue-800 bg-blue-50 p-3 rounded-lg border border-blue-200">
+              <strong>📊 Smart Scheduling:</strong> With {teams.length} teams, some may get extra games to ensure everyone gets at least {gamesPerTeam} games. Back-to-back games are minimized.
             </div>
             {isAdmin && (
               <Button
