@@ -282,7 +282,7 @@ export default function PoolPlay({
         
         // Find the best match for this round with enhanced anti-back-to-back logic
         let bestMatch: {team1: Team, team2: Team} | null = null
-        let bestScore = -1
+        let bestScore = Number.NEGATIVE_INFINITY // Start with very low score to accept any match
         let bestIndex = -1
         
         for (let i = 0; i < remainingMatches.length; i++) {
@@ -297,23 +297,31 @@ export default function PoolPlay({
           // Base score: favor teams that haven't played recently
           let matchScore = team1Rest + team2Rest
           
-          // ENHANCED SCORING: Heavily penalize back-to-back games
-          if (team1LastRound === round - 1) matchScore -= 100 // Team1 played last round
-          if (team2LastRound === round - 1) matchScore -= 100 // Team2 played last round
+          // MODERATE SCORING: Penalize back-to-back games but not so severely that no matches are viable
+          if (team1LastRound === round - 1) matchScore -= 10 // Reduced penalty from 100 to 10
+          if (team2LastRound === round - 1) matchScore -= 10 // Reduced penalty from 100 to 10
           
           // Bonus for teams that haven't played in 2+ rounds
-          if (team1Rest >= 2) matchScore += 50
-          if (team2Rest >= 2) matchScore += 50
+          if (team1Rest >= 2) matchScore += 5
+          if (team2Rest >= 2) matchScore += 5
           
           // Extra bonus for teams that haven't played in 3+ rounds
-          if (team1Rest >= 3) matchScore += 100
-          if (team2Rest >= 3) matchScore += 100
+          if (team1Rest >= 3) matchScore += 10
+          if (team2Rest >= 3) matchScore += 10
           
           if (matchScore > bestScore) {
             bestScore = matchScore
             bestMatch = match
             bestIndex = i
           }
+        }
+        
+        // FALLBACK: If no match was found (shouldn't happen with new scoring), just take the first one
+        if (!bestMatch && remainingMatches.length > 0) {
+          console.warn(`⚠️ No optimal match found for round ${round}, selecting first available match`)
+          bestMatch = remainingMatches[0]
+          bestIndex = 0
+          bestScore = 0
         }
         
         if (bestMatch) {
@@ -342,7 +350,7 @@ export default function PoolPlay({
           
           // Enhanced logging with rest period info
           const restInfo = `${bestMatch.team1.name}(+${team1Rest}) vs ${bestMatch.team2.name}(+${team2Rest})`
-          console.log(`   Game ${round}: ${restInfo}`)
+          console.log(`   Game ${round}: ${restInfo} (score: ${bestScore})`)
           
           // Warning for back-to-back games
           if (team1Rest === 1) console.warn(`   ⚠️ ${bestMatch.team1.name} playing back-to-back!`)
@@ -350,8 +358,12 @@ export default function PoolPlay({
           
           round++
         } else {
-          // Shouldn't happen, but safety break
-          console.error("❌ Could not find a valid match to schedule")
+          // This should never happen now with the fallback
+          console.error("❌ Could not find a valid match to schedule - this should not happen!")
+          console.error(`   Remaining matches: ${remainingMatches.length}`)
+          remainingMatches.forEach((match, i) => {
+            console.error(`     ${i}: ${match.team1.name} vs ${match.team2.name}`)
+          })
           break
         }
       }
