@@ -175,12 +175,21 @@ export default function PoolPlay({
         if (teamsNeedingGames.length === 0) break
         
         console.log(`🔄 Phase 2 iteration ${safetyCounter}: ${teamsNeedingGames.length} teams still need games`)
+        teamsNeedingGames.forEach(team => {
+          const currentGames = tempGameCount.get(team.id) || 0
+          console.log(`    ${team.name}: ${currentGames}/${targetGames} games`)
+        })
         
         for (const team of teamsNeedingGames) {
           const currentGames = tempGameCount.get(team.id) || 0
           const gamesNeeded = targetGames - currentGames
           
-          if (gamesNeeded <= 0) continue
+          console.log(`🎯 Processing ${team.name}: needs ${gamesNeeded} more games`)
+          
+          if (gamesNeeded <= 0) {
+            console.log(`  ✅ ${team.name} already has enough games, skipping`)
+            continue
+          }
           
           // Find ALL available opponents (not just those under the limit)
           const potentialOpponents = teams.filter(opponent => {
@@ -201,20 +210,33 @@ export default function PoolPlay({
             return aGames - bGames
           })
           
+          console.log(`  🔍 Found ${potentialOpponents.length} potential opponents for ${team.name}:`)
+          potentialOpponents.slice(0, 5).forEach(opp => { // Show first 5
+            const oppGames = tempGameCount.get(opp.id) || 0
+            console.log(`    - ${opp.name} (${oppGames} games)`)
+          })
+          if (potentialOpponents.length > 5) {
+            console.log(`    ... and ${potentialOpponents.length - 5} more`)
+          }
+          
           if (potentialOpponents.length === 0) {
             console.warn(`⚠️ No available opponents for ${team.name} (${currentGames}/${targetGames} games)`)
+            console.warn(`     All teams already played against: ${teams.filter(t => t.id !== team.id).map(t => t.name).join(', ')}`)
             continue
           }
           
           // Add games for this team until they reach the minimum
-          for (let i = 0; i < Math.min(gamesNeeded, potentialOpponents.length); i++) {
+          const matchesToAdd = Math.min(gamesNeeded, potentialOpponents.length)
+          console.log(`  ➕ Adding ${matchesToAdd} matches for ${team.name}`)
+          
+          for (let i = 0; i < matchesToAdd; i++) {
             const opponent = potentialOpponents[i]
             
             allNeededMatches.push({team1: team, team2: opponent})
             tempGameCount.set(team.id, (tempGameCount.get(team.id) || 0) + 1)
             tempGameCount.set(opponent.id, (tempGameCount.get(opponent.id) || 0) + 1)
             
-            console.log(`➕ Added match: ${team.name} vs ${opponent.name} (${team.name}: ${tempGameCount.get(team.id)}, ${opponent.name}: ${tempGameCount.get(opponent.id)})`)
+            console.log(`    ✅ ${team.name} vs ${opponent.name} (${team.name}: ${tempGameCount.get(team.id)}, ${opponent.name}: ${tempGameCount.get(opponent.id)})`)
             additionalMatchesNeeded = true
           }
         }
@@ -324,18 +346,35 @@ export default function PoolPlay({
       
       console.log(`📊 Final games per team:`, finalGameCounts)
       
-      // Check for teams below minimum target
-      const teamsBelowMinimum = teams.filter(t => {
-        const count = scheduledMatches.filter(m => m.team1.id === t.id || m.team2.id === t.id).length + 
-                     matches.filter(m => m.team1.id === t.id || m.team2.id === t.id).length
-        return count < targetGames
-      })
+      // DETAILED VALIDATION: Check each team's game count
+      console.log(`🔍 VALIDATION: Checking all teams have at least ${targetGames} games...`)
+      const teamsBelowMinimum = []
+      
+      for (const team of teams) {
+        const existingGames = matches.filter(m => m.team1.id === team.id || m.team2.id === team.id).length
+        const newGames = scheduledMatches.filter(m => m.team1.id === team.id || m.team2.id === team.id).length
+        const totalGames = existingGames + newGames
+        
+        console.log(`  ${team.name}: ${existingGames} existing + ${newGames} new = ${totalGames} total games`)
+        
+        if (totalGames < targetGames) {
+          teamsBelowMinimum.push({ team, totalGames })
+        }
+      }
       
       if (teamsBelowMinimum.length > 0) {
-        console.error(`❌ BUG DETECTED: Teams below minimum ${targetGames} games:`, 
-          teamsBelowMinimum.map(t => `${t.name}: ${finalGameCounts[t.name]} games`)
-        )
-        alert(`Error: Some teams would have fewer than ${targetGames} games. Please contact the admin.`)
+        console.error(`❌ ALGORITHM FAILED: ${teamsBelowMinimum.length} teams below minimum:`)
+        teamsBelowMinimum.forEach(({ team, totalGames }) => {
+          console.error(`  - ${team.name}: ${totalGames}/${targetGames} games`)
+        })
+        
+        // Show what matches were generated
+        console.error(`📋 Generated matches (${scheduledMatches.length}):`)
+        scheduledMatches.forEach((match, i) => {
+          console.error(`  ${i + 1}: ${match.team1.name} vs ${match.team2.name}`)
+        })
+        
+        alert(`Error: Algorithm failed to give all teams minimum ${targetGames} games. Check console for details.`)
         return
       }
       
