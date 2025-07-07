@@ -25,6 +25,7 @@ export default function KnockoutBracket({ matches, poolPlayMatches, updateMatch,
   const [team1Score, setTeam1Score] = useState("")
   const [team2Score, setTeam2Score] = useState("")
   const [champion, setChampion] = useState<Team | null>(null)
+  const [creatingRounds, setCreatingRounds] = useState<Set<number>>(new Set()) // Track rounds being created
 
   // Calculate all bye teams based on bracket size and participating teams
   const calculateByeTeams = (): Team[] => {
@@ -218,8 +219,9 @@ export default function KnockoutBracket({ matches, poolPlayMatches, updateMatch,
           
           console.log(`🔍 Round ${currentRound} completed: ${currentRoundMatches.length} matches`)
           console.log(`  📊 Next round matches exist: ${nextRoundMatches.length}, expected: ${expectedNextRoundMatches}`)
+          console.log(`  🔒 Round ${currentRound + 1} creation in progress: ${creatingRounds.has(currentRound + 1)}`)
           
-          if (nextRoundMatches.length === 0) {
+          if (nextRoundMatches.length === 0 && !creatingRounds.has(currentRound + 1)) {
             // Get winners from current round
             const winners: Team[] = []
             currentRoundMatches.forEach((match) => {
@@ -284,7 +286,23 @@ export default function KnockoutBracket({ matches, poolPlayMatches, updateMatch,
             
             if (nextRoundMatchesToCreate.length > 0) {
               console.log(`🏆 Creating ${nextRoundMatchesToCreate.length} new matches for round ${currentRound + 1}`)
-              await createMatches(nextRoundMatchesToCreate)
+              
+              // Lock this round to prevent duplicates
+              setCreatingRounds(prev => new Set([...prev, currentRound + 1]))
+              
+              try {
+                await createMatches(nextRoundMatchesToCreate)
+                console.log(`✅ Round ${currentRound + 1} matches created successfully`)
+              } catch (error) {
+                console.error(`❌ Failed to create round ${currentRound + 1} matches:`, error)
+              } finally {
+                // Always unlock the round, whether success or failure
+                setCreatingRounds(prev => {
+                  const newSet = new Set(prev)
+                  newSet.delete(currentRound + 1)
+                  return newSet
+                })
+              }
             } else {
               console.log(`ℹ️ No new matches to create - all matches already exist`)
             }
@@ -327,8 +345,9 @@ export default function KnockoutBracket({ matches, poolPlayMatches, updateMatch,
             
             console.log(`  👥 Total advancing teams: ${winners.length}`)
             console.log(`  📊 Next round matches exist: ${nextRoundMatches.length}`)
+            console.log(`  🔒 Round ${currentRound + 1} creation in progress: ${creatingRounds.has(currentRound + 1)}`)
             
-            if (winners.length >= 2) {
+            if (winners.length >= 2 && !creatingRounds.has(currentRound + 1)) {
               // Sort by seed number to maintain proper bracket seeding
               winners.sort((a, b) => getSeedNumber(a) - getSeedNumber(b))
               
@@ -382,7 +401,23 @@ export default function KnockoutBracket({ matches, poolPlayMatches, updateMatch,
               
               if (nextRoundMatchesToCreate.length > 0) {
                 console.log(`🏆 Creating ${nextRoundMatchesToCreate.length} new matches for round ${currentRound + 1}`)
-                await createMatches(nextRoundMatchesToCreate)
+                
+                // Lock this round to prevent duplicates
+                setCreatingRounds(prev => new Set([...prev, currentRound + 1]))
+                
+                try {
+                  await createMatches(nextRoundMatchesToCreate)
+                  console.log(`✅ Round ${currentRound + 1} matches created successfully`)
+                } catch (error) {
+                  console.error(`❌ Failed to create round ${currentRound + 1} matches:`, error)
+                } finally {
+                  // Always unlock the round, whether success or failure
+                  setCreatingRounds(prev => {
+                    const newSet = new Set(prev)
+                    newSet.delete(currentRound + 1)
+                    return newSet
+                  })
+                }
               } else {
                 console.log(`ℹ️ No new matches to create - all matches already exist`)
               }
