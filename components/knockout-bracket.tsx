@@ -216,6 +216,9 @@ export default function KnockoutBracket({ matches, poolPlayMatches, updateMatch,
           const nextRoundMatches = matches.filter((m) => m.phase === "knockout" && m.round === currentRound + 1)
           const expectedNextRoundMatches = Math.floor((currentRoundMatches.length + byeTeams.length) / 2)
           
+          console.log(`🔍 Round ${currentRound} completed: ${currentRoundMatches.length} matches`)
+          console.log(`  📊 Next round matches exist: ${nextRoundMatches.length}, expected: ${expectedNextRoundMatches}`)
+          
           if (nextRoundMatches.length === 0) {
             // Get winners from current round
             const winners: Team[] = []
@@ -253,6 +256,21 @@ export default function KnockoutBracket({ matches, poolPlayMatches, updateMatch,
                 continue
               }
               
+              // ENHANCED DUPLICATE CHECK: Check if this specific matchup already exists
+              const duplicateMatch = matches.find(m => 
+                m.phase === "knockout" && 
+                m.round === currentRound + 1 &&
+                ((m.team1.id === team1.id && m.team2.id === team2.id) ||
+                 (m.team1.id === team2.id && m.team2.id === team1.id))
+              )
+              
+              if (duplicateMatch) {
+                console.warn(`⚠️ DUPLICATE PREVENTED: Match ${team1.name} vs ${team2.name} already exists in round ${currentRound + 1}`)
+                continue
+              }
+              
+              console.log(`  🆕 Creating: #${getSeedNumber(team1)} ${team1.name} vs #${getSeedNumber(team2)} ${team2.name}`)
+              
               nextRoundMatchesToCreate.push({
                 team1,
                 team2,
@@ -264,7 +282,12 @@ export default function KnockoutBracket({ matches, poolPlayMatches, updateMatch,
               })
             }
             
-            await createMatches(nextRoundMatchesToCreate)
+            if (nextRoundMatchesToCreate.length > 0) {
+              console.log(`🏆 Creating ${nextRoundMatchesToCreate.length} new matches for round ${currentRound + 1}`)
+              await createMatches(nextRoundMatchesToCreate)
+            } else {
+              console.log(`ℹ️ No new matches to create - all matches already exist`)
+            }
           }
         } else if (completedCurrentRound && currentRoundMatches.length === 1) {
           // Check if this is truly the final match or just a single match in an early round
@@ -303,6 +326,7 @@ export default function KnockoutBracket({ matches, poolPlayMatches, updateMatch,
             }
             
             console.log(`  👥 Total advancing teams: ${winners.length}`)
+            console.log(`  📊 Next round matches exist: ${nextRoundMatches.length}`)
             
             if (winners.length >= 2) {
               // Sort by seed number to maintain proper bracket seeding
@@ -328,6 +352,19 @@ export default function KnockoutBracket({ matches, poolPlayMatches, updateMatch,
                   continue
                 }
                 
+                // ENHANCED DUPLICATE CHECK: Check if this specific matchup already exists
+                const duplicateMatch = matches.find(m => 
+                  m.phase === "knockout" && 
+                  m.round === currentRound + 1 &&
+                  ((m.team1.id === team1.id && m.team2.id === team2.id) ||
+                   (m.team1.id === team2.id && m.team2.id === team1.id))
+                )
+                
+                if (duplicateMatch) {
+                  console.warn(`⚠️ DUPLICATE PREVENTED: Match ${team1.name} vs ${team2.name} already exists in round ${currentRound + 1}`)
+                  continue
+                }
+                
                 const team1Seed = getSeedNumber(team1)
                 const team2Seed = getSeedNumber(team2)
                 console.log(`    🥊 Match ${i + 1}: #${team1Seed} ${team1.name} vs #${team2Seed} ${team2.name}`)
@@ -343,7 +380,12 @@ export default function KnockoutBracket({ matches, poolPlayMatches, updateMatch,
                 })
               }
               
-              await createMatches(nextRoundMatchesToCreate)
+              if (nextRoundMatchesToCreate.length > 0) {
+                console.log(`🏆 Creating ${nextRoundMatchesToCreate.length} new matches for round ${currentRound + 1}`)
+                await createMatches(nextRoundMatchesToCreate)
+              } else {
+                console.log(`ℹ️ No new matches to create - all matches already exist`)
+              }
             }
           }
         }
