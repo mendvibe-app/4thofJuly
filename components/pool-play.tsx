@@ -117,12 +117,23 @@ export default function PoolPlay({
       const shuffledTeams = [...teams].sort(() => Math.random() - 0.5)
       
       // Phase 1: Create matches between teams that both need games
+      console.log(`🚀 Phase 1: Creating initial matches between teams needing games`)
       for (let attempts = 0; attempts < 500; attempts++) {
         const teamsNeedingGames = shuffledTeams.filter(team => 
           (tempGameCount.get(team.id) || 0) < targetGames
         )
         
-        if (teamsNeedingGames.length === 0) break
+        if (attempts === 0) {
+          console.log(`📊 Phase 1 start: ${teamsNeedingGames.length} teams need games:`)
+          teamsNeedingGames.forEach(team => {
+            console.log(`  - ${team.name}: ${tempGameCount.get(team.id) || 0}/${targetGames}`)
+          })
+        }
+        
+        if (teamsNeedingGames.length === 0) {
+          console.log(`✅ Phase 1 complete: All teams have enough games`)
+          break
+        }
         
         let matchCreated = false
         for (let i = 0; i < teamsNeedingGames.length - 1; i++) {
@@ -134,6 +145,7 @@ export default function PoolPlay({
             const team1Games = tempGameCount.get(team1.id) || 0
             const team2Games = tempGameCount.get(team2.id) || 0
             if (team1Games >= targetGames || team2Games >= targetGames) {
+              if (attempts < 5) console.log(`  ⏭️ Skipping ${team1.name} vs ${team2.name} - at limit (${team1Games}, ${team2Games})`)
               continue
             }
             
@@ -150,14 +162,25 @@ export default function PoolPlay({
               allNeededMatches.push({team1, team2})
               tempGameCount.set(team1.id, (tempGameCount.get(team1.id) || 0) + 1)
               tempGameCount.set(team2.id, (tempGameCount.get(team2.id) || 0) + 1)
+              if (attempts < 10) console.log(`  ➕ Phase 1: ${team1.name} vs ${team2.name} (${tempGameCount.get(team1.id)}, ${tempGameCount.get(team2.id)})`)
               matchCreated = true
               break
+            } else {
+              if (attempts < 5) console.log(`  ⏭️ Skipping ${team1.name} vs ${team2.name} - already played`)
             }
           }
           if (matchCreated) break
         }
-        if (!matchCreated) break
+        if (!matchCreated) {
+          console.log(`🛑 Phase 1 ended: No more matches can be created (attempt ${attempts + 1})`)
+          break
+        }
       }
+      
+      console.log(`📋 Phase 1 complete: ${allNeededMatches.length} matches created`)
+      console.log(`📊 Games after Phase 1:`, Object.fromEntries(
+        teams.map(t => [t.name, tempGameCount.get(t.id) || 0])
+      ))
       
       // Phase 2: Ensure ALL teams get AT LEAST the target number of games
       let additionalMatchesNeeded = true
