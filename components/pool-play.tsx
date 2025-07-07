@@ -130,6 +130,13 @@ export default function PoolPlay({
           for (let j = i + 1; j < teamsNeedingGames.length; j++) {
             const team2 = teamsNeedingGames[j]
             
+            // SAFEGUARD: Check if either team would exceed their limit
+            const team1Games = tempGameCount.get(team1.id) || 0
+            const team2Games = tempGameCount.get(team2.id) || 0
+            if (team1Games >= targetGames || team2Games >= targetGames) {
+              continue
+            }
+            
             // Check if these teams have already played
             const alreadyPlayed = matches.some(match => 
               (match.team1.id === team1.id && match.team2.id === team2.id) ||
@@ -163,6 +170,11 @@ export default function PoolPlay({
         
         const potentialOpponents = teams.filter(opponent => {
           if (opponent.id === team.id) return false
+          
+          // BUG FIX: Check if opponent would exceed their game limit
+          const opponentCurrentGames = tempGameCount.get(opponent.id) || 0
+          if (opponentCurrentGames >= targetGames) return false
+          
           const alreadyPlayed = matches.some(match => 
             (match.team1.id === team.id && match.team2.id === opponent.id) ||
             (match.team1.id === opponent.id && match.team2.id === team.id)
@@ -175,6 +187,14 @@ export default function PoolPlay({
         
         for (let i = 0; i < Math.min(gamesNeeded, potentialOpponents.length); i++) {
           const opponent = potentialOpponents[i]
+          
+          // Double-check opponent won't exceed limit (extra safety)
+          const opponentCurrentGames = tempGameCount.get(opponent.id) || 0
+          if (opponentCurrentGames >= targetGames) {
+            console.warn(`⚠️ Skipping match for ${team.name} vs ${opponent.name} - opponent already at limit (${opponentCurrentGames}/${targetGames})`)
+            continue
+          }
+          
           allNeededMatches.push({team1: team, team2: opponent})
           tempGameCount.set(team.id, (tempGameCount.get(team.id) || 0) + 1)
           tempGameCount.set(opponent.id, (tempGameCount.get(opponent.id) || 0) + 1)
@@ -244,13 +264,34 @@ export default function PoolPlay({
       }
       
       console.log(`🏁 Schedule created! ${scheduledMatches.length} games scheduled.`)
-      console.log(`📊 Final games per team:`, Object.fromEntries(
+      
+      // VALIDATION: Final check to ensure no team exceeds the target game count
+      const finalGameCounts = Object.fromEntries(
         teams.map(t => {
           const count = scheduledMatches.filter(m => m.team1.id === t.id || m.team2.id === t.id).length + 
                        matches.filter(m => m.team1.id === t.id || m.team2.id === t.id).length
           return [t.name, count]
         })
-      ))
+      )
+      
+      console.log(`📊 Final games per team:`, finalGameCounts)
+      
+      // Check for teams exceeding target
+      const teamsExceedingLimit = teams.filter(t => {
+        const count = scheduledMatches.filter(m => m.team1.id === t.id || m.team2.id === t.id).length + 
+                     matches.filter(m => m.team1.id === t.id || m.team2.id === t.id).length
+        return count > targetGames
+      })
+      
+      if (teamsExceedingLimit.length > 0) {
+        console.error(`❌ BUG DETECTED: Teams exceeding ${targetGames} game limit:`, 
+          teamsExceedingLimit.map(t => `${t.name}: ${finalGameCounts[t.name]} games`)
+        )
+        alert(`Error: Some teams would exceed the ${targetGames} game limit. Please contact the admin.`)
+        return
+      }
+      
+      console.log(`✅ Validation passed: All teams within ${targetGames} game limit`)
       
       // Show schedule preview
       console.log(`📅 Game Schedule Preview:`)
@@ -292,6 +333,15 @@ export default function PoolPlay({
       // NEW SYSTEM: Include ALL teams in knockout phase
       const allTeams = standings // All teams advance, no eliminations
       
+      // VALIDATION: Check for duplicate teams
+      const teamIds = allTeams.map(t => t.id)
+      const uniqueTeamIds = [...new Set(teamIds)]
+      if (teamIds.length !== uniqueTeamIds.length) {
+        console.error(`❌ BUG DETECTED: Duplicate teams in standings!`, allTeams.map(t => `${t.name}(${t.id})`))
+        alert("Error: Duplicate teams detected in standings. Please contact admin.")
+        return
+      }
+      
       // Calculate bracket size as next power of 2 >= total teams
       const bracketSize = Math.pow(2, Math.ceil(Math.log2(allTeams.length)))
       const byesNeeded = bracketSize - allTeams.length
@@ -309,6 +359,16 @@ export default function PoolPlay({
       // Distribute byes to top seeds
       const byeTeams = allTeams.slice(0, byesNeeded)
       const playingTeams = allTeams.slice(byesNeeded)
+      
+      // VALIDATION: Ensure no team appears in both bye and playing lists
+      const byeTeamIds = new Set(byeTeams.map(t => t.id))
+      const playingTeamIds = new Set(playingTeams.map(t => t.id))
+      const overlap = [...byeTeamIds].filter(id => playingTeamIds.has(id))
+      if (overlap.length > 0) {
+        console.error(`❌ BUG DETECTED: Teams appear in both bye and playing lists!`, overlap)
+        alert("Error: Team assignment conflict detected. Please contact admin.")
+        return
+      }
       
       console.log(`👋 Teams with BYES (${byeTeams.length}):`)
       byeTeams.forEach((team, index) => {
@@ -344,6 +404,30 @@ export default function PoolPlay({
         const team1 = playingTeams[i]  // Higher seed among playing teams
         const team2 = playingTeams[playingTeams.length - 1 - i]  // Lower seed
         
+        // VALIDATION: Ensure neither team has a bye
+        if (byeTeamIds.has(team1.id)) {
+          console.error(`❌ BUG DETECTED: Bye team ${team1.name} included in first round match!`)
+          alert(`Error: Bye team ${team1.name} incorrectly scheduled for first round. Please contact admin.`)
+          return
+        }
+        if (byeTeamIds.has(team2.id)) {
+          console.error(`❌ BUG DETECTED: Bye team ${team2.name} included in first round match!`)
+          alert(`Error: Bye team ${team2.name} incorrectly scheduled for first round. Please contact admin.`)
+          return
+        }
+        
+        // Validate teams exist and are different
+        if (!team1 || !team2) {
+          console.error(`❌ BUG DETECTED: Missing teams for match ${i + 1}:`, { team1, team2 })
+          alert("Error: Missing team data for match creation. Please contact admin.")
+          return
+        }
+        if (team1.id === team2.id) {
+          console.error(`❌ BUG DETECTED: Team ${team1.name} scheduled to play itself!`)
+          alert(`Error: Team ${team1.name} scheduled to play itself. Please contact admin.`)
+          return
+        }
+        
         // Calculate actual seed numbers including bye teams
         const team1Seed = allTeams.findIndex(t => t.id === team1.id) + 1
         const team2Seed = allTeams.findIndex(t => t.id === team2.id) + 1
@@ -361,12 +445,26 @@ export default function PoolPlay({
         console.log(`🥊 Match ${i + 1}: #${team1Seed} ${team1.name} vs #${team2Seed} ${team2.name}`)
       }
 
+      // FINAL VALIDATION: Ensure all teams are accounted for
+      const teamsInMatches = knockoutMatches.length * 2 // 2 teams per match
+      const totalTeamsPlaced = byeTeams.length + teamsInMatches
+      if (totalTeamsPlaced !== allTeams.length) {
+        console.error(`❌ BUG DETECTED: Team count mismatch!`)
+        console.error(`  Total teams: ${allTeams.length}`)
+        console.error(`  Bye teams: ${byeTeams.length}`)
+        console.error(`  Teams in matches: ${teamsInMatches}`)
+        console.error(`  Total placed: ${totalTeamsPlaced}`)
+        alert(`Error: Team count mismatch detected (${totalTeamsPlaced}/${allTeams.length} teams placed). Please contact admin.`)
+        return
+      }
+
       if (knockoutMatches.length > 0) {
         await createMatches(knockoutMatches)
       }
 
       console.log(`🎉 Knockout bracket generated successfully!`)
       console.log(`📊 Bracket: ${bracketSize} teams, ${byesNeeded} byes, ${knockoutMatches.length} first round matches`)
+      console.log(`✅ Validation passed: All ${allTeams.length} teams properly placed`)
       onAdvanceToKnockout()
     } catch (error) {
       console.error("Error generating knockout bracket:", error)

@@ -247,6 +247,12 @@ export default function KnockoutBracket({ matches, poolPlayMatches, updateMatch,
                 continue
               }
               
+              // VALIDATION: Ensure teams are different
+              if (team1.id === team2.id) {
+                console.error(`❌ BUG DETECTED: Team ${team1.name} scheduled to play itself in round ${currentRound + 1}!`)
+                continue
+              }
+              
               nextRoundMatchesToCreate.push({
                 team1,
                 team2,
@@ -313,6 +319,12 @@ export default function KnockoutBracket({ matches, poolPlayMatches, updateMatch,
                 // Validate teams before creating match
                 if (!team1 || !team2) {
                   console.error(`❌ Invalid teams for match ${i}:`, { team1, team2 })
+                  continue
+                }
+                
+                // VALIDATION: Ensure teams are different
+                if (team1.id === team2.id) {
+                  console.error(`❌ BUG DETECTED: Team ${team1.name} scheduled to play itself in round ${currentRound + 1}!`)
                   continue
                 }
                 
