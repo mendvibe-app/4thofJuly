@@ -254,6 +254,17 @@ export default function TournamentApp() {
             
             <div className="space-y-4">
               <Button
+                onClick={() => {
+                  setShowMobileMenu(false)
+                  window.open("/register", "_blank")
+                }}
+                className="w-full justify-start h-14 outdoor-text bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                <Users className="w-5 h-5 mr-3" />
+                Register Team
+              </Button>
+              
+              <Button
                 onClick={() => window.open("/standings", "_blank")}
                 variant="outline"
                 className="w-full justify-start h-14 outdoor-text"

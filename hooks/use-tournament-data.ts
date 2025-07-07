@@ -1,11 +1,13 @@
 "use client"
 
-import type { Match, Team, TournamentPhase } from "@/types/tournament"
+import type { Match, Team, TournamentPhase, Tournament, PendingRegistration } from "@/types/tournament"
 import { useState, useEffect, useCallback } from "react"
 import { supabase } from "@/lib/supabase"
 import { RealtimeChannel } from "@supabase/supabase-js"
 
 export function useTournamentData() {
+  const [tournaments, setTournaments] = useState<Tournament[]>([])
+  const [pendingRegistrations, setPendingRegistrations] = useState<PendingRegistration[]>([])
   const [teams, setTeams] = useState<Team[]>([])
   const [poolPlayMatches, setPoolPlayMatches] = useState<Match[]>([])
   const [knockoutMatches, setKnockoutMatches] = useState<Match[]>([])
@@ -24,6 +26,54 @@ export function useTournamentData() {
   // Set up real-time subscriptions with enhanced error handling
   useEffect(() => {
     console.log("🔄 Setting up real-time subscriptions...")
+    
+    // Subscribe to tournaments changes
+    const tournamentsSubscription = supabase
+      .channel("tournaments-changes")
+      .on(
+        "postgres_changes",
+        { 
+          event: "*", 
+          schema: "public", 
+          table: "tournaments" 
+        },
+        (payload) => {
+          console.log("🔄 Tournaments updated - reloading...", payload)
+          loadTournaments()
+        }
+      )
+      .subscribe((status, err) => {
+        console.log("📡 Tournaments subscription status:", status)
+        if (err) {
+          console.error("❌ Tournaments subscription error:", err)
+        } else if (status === "SUBSCRIBED") {
+          console.log("✅ Tournaments real-time subscription active")
+        }
+      })
+
+    // Subscribe to pending registrations changes
+    const pendingRegistrationsSubscription = supabase
+      .channel("pending-registrations-changes")
+      .on(
+        "postgres_changes",
+        { 
+          event: "*", 
+          schema: "public", 
+          table: "pending_team_registrations" 
+        },
+        (payload) => {
+          console.log("🔄 Pending registrations updated - reloading...", payload)
+          loadPendingRegistrations()
+        }
+      )
+      .subscribe((status, err) => {
+        console.log("📡 Pending registrations subscription status:", status)
+        if (err) {
+          console.error("❌ Pending registrations subscription error:", err)
+        } else if (status === "SUBSCRIBED") {
+          console.log("✅ Pending registrations real-time subscription active")
+        }
+      })
     
     // Subscribe to teams changes
     const teamsSubscription = supabase
@@ -73,54 +123,30 @@ export function useTournamentData() {
         }
       })
 
-    // Subscribe to tournament settings changes
-    const settingsSubscription = supabase
-      .channel("settings-changes")
-      .on(
-        "postgres_changes",
-        { 
-          event: "*", 
-          schema: "public", 
-          table: "tournament_settings" 
-        },
-        (payload) => {
-          console.log("🔄 Tournament settings updated - reloading...", payload)
-          loadTournamentSettings()
-        }
+    const newSubscriptions = [
+      tournamentsSubscription,
+      pendingRegistrationsSubscription,
+      teamsSubscription,
+      matchesSubscription
+    ]
+    setSubscriptions(newSubscriptions)
+
+    // Check connection after subscriptions
+    setTimeout(() => {
+      const allSubscribed = newSubscriptions.every(sub => 
+        sub.state === "joined"
       )
-      .subscribe((status, err) => {
-        console.log("📡 Settings subscription status:", status)
-        if (err) {
-          console.error("❌ Settings subscription error:", err)
-        } else if (status === "SUBSCRIBED") {
-          console.log("✅ Settings real-time subscription active")
-        }
-      })
+      setRealtimeConnected(allSubscribed)
+      console.log("📡 Real-time connection status:", allSubscribed ? "Connected" : "Disconnected")
+    }, 3000)
 
-    // Monitor overall real-time connection status
-    const connectionSubscription = supabase
-      .channel("connection-status")
-      .subscribe((status, err) => {
-        console.log("📡 Real-time connection status:", status)
-        if (err) {
-          console.error("❌ Real-time connection error:", err)
-          setRealtimeConnected(false)
-        } else if (status === "SUBSCRIBED") {
-          setRealtimeConnected(true)
-          console.log("✅ Real-time connection established")
-        } else if (status === "CLOSED") {
-          setRealtimeConnected(false)
-          console.log("⚠️ Real-time connection closed")
-        }
-      })
-
-    const allSubscriptions = [teamsSubscription, matchesSubscription, settingsSubscription, connectionSubscription]
-    setSubscriptions(allSubscriptions)
-
-    // Cleanup function
     return () => {
-      console.log("🧹 Cleaning up real-time subscriptions...")
-      allSubscriptions.forEach(sub => sub.unsubscribe())
+      console.log("🔄 Cleaning up real-time subscriptions...")
+      newSubscriptions.forEach(subscription => {
+        subscription.unsubscribe()
+      })
+      setSubscriptions([])
+      setRealtimeConnected(false)
     }
   }, [])
 
@@ -131,7 +157,13 @@ export function useTournamentData() {
     setConnectionStatus("connecting")
 
     try {
-      await Promise.all([loadTeams(), loadMatches(), loadTournamentSettings()])
+      await Promise.all([
+        loadTournaments(),
+        loadPendingRegistrations(),
+        loadTeams(), 
+        loadMatches(), 
+        loadTournamentSettings()
+      ])
       setConnectionStatus("connected")
       console.log("✅ Tournament data loaded successfully!")
     } catch (error) {
@@ -142,9 +174,94 @@ export function useTournamentData() {
     }
   }, [])
 
-  // Polling fallback system
-  const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null)
-  const [isPolling, setIsPolling] = useState(false)
+  // Load tournaments
+  const loadTournaments = async () => {
+    try {
+      console.log("🏆 Loading tournaments...")
+      const { data, error } = await supabase
+        .from("tournaments")
+        .select("*")
+        .order("date", { ascending: false })
+
+      if (error) {
+        if (error.code === "42P01") {
+          console.warn("⚠️ Tournaments table doesn't exist yet. Run the SQL script in Supabase!")
+          setTournaments([])
+          return
+        }
+        throw error
+      }
+
+      const formattedTournaments: Tournament[] = data.map((tournament) => ({
+        id: tournament.id,
+        name: tournament.name,
+        date: tournament.date,
+        status: tournament.status,
+        currentPhase: tournament.current_phase,
+        byeTeamId: tournament.bye_team_id,
+        createdAt: tournament.created_at,
+        updatedAt: tournament.updated_at,
+      }))
+
+      setTournaments(formattedTournaments)
+      console.log(`✅ Loaded ${formattedTournaments.length} tournaments`)
+    } catch (error) {
+      console.error("❌ Error loading tournaments:", error)
+      setTournaments([])
+    }
+  }
+
+  // Load pending registrations
+  const loadPendingRegistrations = async () => {
+    try {
+      console.log("📋 Loading pending registrations...")
+      const { data, error } = await supabase
+        .from("pending_team_registrations")
+        .select(`
+          *,
+          tournaments(*)
+        `)
+        .order("submitted_at", { ascending: false })
+
+      if (error) {
+        if (error.code === "42P01") {
+          console.warn("⚠️ Pending registrations table doesn't exist yet. Run the SQL script in Supabase!")
+          setPendingRegistrations([])
+          return
+        }
+        throw error
+      }
+
+      const formattedRegistrations: PendingRegistration[] = data.map((reg) => ({
+        id: reg.id,
+        tournamentId: reg.tournament_id,
+        tournament: reg.tournaments ? {
+          id: reg.tournaments.id,
+          name: reg.tournaments.name,
+          date: reg.tournaments.date,
+          status: reg.tournaments.status,
+          currentPhase: reg.tournaments.current_phase,
+          byeTeamId: reg.tournaments.bye_team_id,
+          createdAt: reg.tournaments.created_at,
+          updatedAt: reg.tournaments.updated_at,
+        } : undefined,
+        teamName: reg.team_name,
+        players: reg.players,
+        contactInfo: reg.contact_info,
+        status: reg.status,
+        adminNotes: reg.admin_notes,
+        submittedAt: reg.submitted_at,
+        reviewedAt: reg.reviewed_at,
+        reviewedBy: reg.reviewed_by,
+      }))
+
+      setPendingRegistrations(formattedRegistrations)
+      console.log(`✅ Loaded ${formattedRegistrations.length} pending registrations`)
+    } catch (error) {
+      console.error("❌ Error loading pending registrations:", error)
+      setPendingRegistrations([])
+    }
+  }
 
   const loadTeams = async () => {
     try {
@@ -163,6 +280,7 @@ export function useTournamentData() {
 
       const formattedTeams: Team[] = data.map((team) => ({
         id: team.id,
+        tournamentId: team.tournament_id,
         name: team.name,
         players: team.players,
         paid: team.paid,
@@ -222,6 +340,7 @@ export function useTournamentData() {
           t.id,
           {
             id: t.id,
+            tournamentId: t.tournament_id,
             name: t.name,
             players: t.players,
             paid: t.paid,
@@ -236,6 +355,7 @@ export function useTournamentData() {
       // Build Match objects
       const formattedMatches: Match[] = matchRows.map((m) => ({
         id: m.id,
+        tournamentId: m.tournament_id,
         team1: teamMap.get(m.team1_id)!,
         team2: teamMap.get(m.team2_id)!,
         team1Score: m.team1_score,
@@ -284,6 +404,7 @@ export function useTournamentData() {
       if (data.bye_team) {
         setByeTeam({
           id: data.bye_team.id,
+          tournamentId: data.bye_team.tournament_id,
           name: data.bye_team.name,
           players: data.bye_team.players,
           paid: data.bye_team.paid,
@@ -303,55 +424,62 @@ export function useTournamentData() {
     }
   }
 
-  // Polling fallback functions
-  const startPollingFallback = useCallback(() => {
-    if (pollingInterval) return // Already polling
-    
-    console.log("🔄 Starting polling fallback (every 30 seconds)")
-    setIsPolling(true)
-    
-    const interval = setInterval(() => {
-      console.log("📡 Polling for updates...")
-      loadTournamentData()
-    }, 30000) // Poll every 30 seconds
-    
-    setPollingInterval(interval)
-  }, [pollingInterval, loadTournamentData])
+  // Tournament management functions
+  const createTournament = async (tournament: Omit<Tournament, "id" | "createdAt" | "updatedAt">) => {
+    console.log("➕ Creating tournament:", tournament.name)
+    const { error } = await supabase.from("tournaments").insert({
+      name: tournament.name,
+      date: tournament.date,
+      status: tournament.status,
+      current_phase: tournament.currentPhase,
+      bye_team_id: tournament.byeTeamId,
+    })
 
-  const stopPollingFallback = useCallback(() => {
-    if (pollingInterval) {
-      console.log("🛑 Stopping polling fallback")
-      clearInterval(pollingInterval)
-      setPollingInterval(null)
-      setIsPolling(false)
+    if (error) {
+      console.error("❌ Error creating tournament:", error)
+      throw error
     }
-  }, [pollingInterval])
+    console.log("✅ Tournament created successfully!")
+    await loadTournaments()
+  }
 
-  // Stop polling if real-time connects
-  useEffect(() => {
-    if (realtimeConnected && isPolling) {
-      console.log("✅ Real-time connected, stopping polling fallback")
-      stopPollingFallback()
+  const updateTournament = async (tournamentId: number, updates: Partial<Tournament>) => {
+    console.log("📝 Updating tournament:", tournamentId)
+    const { error } = await supabase
+      .from("tournaments")
+      .update({
+        name: updates.name,
+        date: updates.date,
+        status: updates.status,
+        current_phase: updates.currentPhase,
+        bye_team_id: updates.byeTeamId,
+      })
+      .eq("id", tournamentId)
+
+    if (error) {
+      console.error("❌ Error updating tournament:", error)
+      throw error
     }
-  }, [realtimeConnected, isPolling, stopPollingFallback])
+    console.log("✅ Tournament updated successfully!")
+    await loadTournaments()
+  }
 
-  // Start polling fallback if real-time doesn't connect
-  useEffect(() => {
-    const fallbackTimer = setTimeout(() => {
-      if (!realtimeConnected) {
-        console.log("⚠️ Real-time not connected, starting polling fallback...")
-        startPollingFallback()
-      }
-    }, 10000)
+  const deleteTournament = async (tournamentId: number) => {
+    console.log("🗑️ Deleting tournament:", tournamentId)
+    const { error } = await supabase.from("tournaments").delete().eq("id", tournamentId)
 
-    return () => {
-      clearTimeout(fallbackTimer)
+    if (error) {
+      console.error("❌ Error deleting tournament:", error)
+      throw error
     }
-  }, [realtimeConnected, startPollingFallback])
+    console.log("✅ Tournament deleted successfully!")
+    await loadTournaments()
+  }
 
   const addTeam = async (team: Omit<Team, "id">) => {
     console.log("➕ Adding team:", team.name)
     const { error } = await supabase.from("teams").insert({
+      tournament_id: team.tournamentId,
       name: team.name,
       players: team.players,
       paid: team.paid,
@@ -377,6 +505,7 @@ export function useTournamentData() {
     const { error } = await supabase
       .from("teams")
       .update({
+        tournament_id: updates.tournamentId,
         name: updates.name,
         players: updates.players,
         paid: updates.paid,
@@ -437,6 +566,7 @@ export function useTournamentData() {
     const { error } = await supabase
       .from("matches")
       .update({
+        tournament_id: updates.tournamentId,
         team1_score: updates.team1Score,
         team2_score: updates.team2Score,
         completed: updates.completed,
@@ -454,167 +584,132 @@ export function useTournamentData() {
     await loadMatches()
   }
 
-  const createMatches = async (matches: Omit<Match, "id">[]) => {
-    console.log("🏆 Creating matches:", matches.length)
-    
-    // Validate input data
-    if (!matches || matches.length === 0) {
-      console.error("❌ No matches provided to create")
-      throw new Error("No matches provided to create")
-    }
-    
-    // Validate each match
-    for (let i = 0; i < matches.length; i++) {
-      const match = matches[i]
-      if (!match.team1 || !match.team2) {
-        console.error(`❌ Invalid match ${i}: Missing team data`, match)
-        throw new Error(`Invalid match ${i}: Missing team data`)
-      }
-      if (!match.team1.id || !match.team2.id) {
-        console.error(`❌ Invalid match ${i}: Missing team IDs`, match)
-        throw new Error(`Invalid match ${i}: Missing team IDs`)
-      }
-    }
-    
-    const matchData = matches.map((match) => ({
-      team1_id: match.team1.id,
-      team2_id: match.team2.id,
-      team1_score: match.team1Score,
-      team2_score: match.team2Score,
-      completed: match.completed,
-      phase: match.phase,
-      round: match.round,
-    }))
+  // Create matches for a specific tournament
+  const createMatches = async (tournamentId: number, matches: Array<{ team1Id: number; team2Id: number; phase: "pool-play" | "knockout"; round?: number }>) => {
+    console.log(`🎯 Creating ${matches.length} matches for tournament ${tournamentId}...`)
 
-    console.log("📝 Match data to insert:", matchData)
-    
-    const { error, data } = await supabase.from("matches").insert(matchData).select()
+    try {
+      const matchInserts = matches.map((match) => ({
+        tournament_id: tournamentId,
+        team1_id: match.team1Id,
+        team2_id: match.team2Id,
+        team1_score: 0,
+        team2_score: 0,
+        completed: false,
+        phase: match.phase,
+        round: match.round || null,
+      }))
 
-    if (error) {
-      console.error("❌ Error creating matches:", error)
-      console.error("❌ Failed data:", matchData)
+      const { data, error } = await supabase.from("matches").insert(matchInserts).select()
+
+      if (error) {
+        console.error("❌ Error creating matches:", error)
+        throw error
+      }
+
+      console.log(`✅ Created ${data.length} matches successfully!`)
+      await loadMatches()
+    } catch (error) {
+      console.error("❌ Error in createMatches:", error)
       throw error
     }
-    console.log("✅ Matches created successfully!", data)
-    
-    // Manually reload matches to update UI
-    console.log("🔄 Manually reloading matches for UI update...")
-    await loadMatches()
   }
 
-  const updateTournamentPhase = async (phase: TournamentPhase) => {
-    console.log("🔄 Updating tournament phase to:", phase)
+  const updateTournamentPhase = async (tournamentId: number, phase: TournamentPhase) => {
+    console.log(`🔄 Updating tournament ${tournamentId} phase to:`, phase)
 
-    // First, ensure tournament_settings record exists
-    const { data: existing } = await supabase.from("tournament_settings").select("id").single()
-
-    if (!existing) {
-      // Create initial record
-      const { error: insertError } = await supabase.from("tournament_settings").insert({
-        current_phase: phase,
-        bye_team_id: null,
-      })
-
-      if (insertError) {
-        console.error("❌ Error creating tournament settings:", insertError)
-        throw insertError
-      }
-    } else {
-      // Update existing record
+    try {
       const { error } = await supabase
-        .from("tournament_settings")
+        .from("tournaments")
         .update({ current_phase: phase })
-        .eq("id", existing.id)
+        .eq("id", tournamentId)
 
       if (error) {
         console.error("❌ Error updating tournament phase:", error)
         throw error
       }
+
+      console.log("✅ Tournament phase updated successfully!")
+      await loadTournaments()
+    } catch (error) {
+      console.error("❌ Error in updateTournamentPhase:", error)
+      throw error
     }
-    console.log("✅ Tournament phase updated successfully!")
-    
-    // Manually reload tournament settings to update UI
-    console.log("🔄 Manually reloading tournament settings for UI update...")
-    await loadTournamentSettings()
   }
 
-  const setByeTeamId = async (teamId: number | null) => {
-    console.log("👋 Setting bye team:", teamId)
+  const setByeTeamId = async (tournamentId: number, teamId: number | null) => {
+    console.log(`🔄 Setting bye team for tournament ${tournamentId}:`, teamId)
 
-    // First, ensure tournament_settings record exists
-    const { data: existing } = await supabase.from("tournament_settings").select("id").single()
-
-    if (!existing) {
-      // Create initial record
-      const { error: insertError } = await supabase.from("tournament_settings").insert({
-        current_phase: "registration",
-        bye_team_id: teamId,
-      })
-
-      if (insertError) {
-        console.error("❌ Error creating tournament settings:", insertError)
-        throw insertError
-      }
-    } else {
-      // Update existing record
-      const { error } = await supabase.from("tournament_settings").update({ bye_team_id: teamId }).eq("id", existing.id)
+    try {
+      const { error } = await supabase
+        .from("tournaments")
+        .update({ bye_team_id: teamId })
+        .eq("id", tournamentId)
 
       if (error) {
         console.error("❌ Error setting bye team:", error)
         throw error
       }
+
+      console.log("✅ Bye team set successfully!")
+      await loadTournaments()
+    } catch (error) {
+      console.error("❌ Error in setByeTeamId:", error)
+      throw error
     }
-    console.log("✅ Bye team set successfully!")
-    
-    // Manually reload tournament settings to update UI
-    console.log("🔄 Manually reloading tournament settings for UI update...")
-    await loadTournamentSettings()
   }
 
-  const resetTournament = async () => {
-    console.log("🔄 Resetting tournament...")
+  const resetTournament = async (tournamentId: number) => {
+    console.log(`🔄 Resetting tournament ${tournamentId}...`)
 
     try {
-      // Step 1: Reset tournament settings first (clear bye_team_id to remove foreign key reference)
-      const { data: existing } = await supabase.from("tournament_settings").select("id").single()
+      // Step 1: Clear bye team reference
+      await supabase
+        .from("tournaments")
+        .update({ bye_team_id: null })
+        .eq("id", tournamentId)
 
-      if (existing) {
-        const { error: settingsError } = await supabase
-          .from("tournament_settings")
-          .update({
-            current_phase: "registration",
-            bye_team_id: null,  // Clear this BEFORE deleting teams
-          })
-          .eq("id", existing.id)
-
-        if (settingsError) {
-          console.error("❌ Error resetting tournament settings:", settingsError)
-          throw settingsError
-        }
-        console.log("✅ Tournament settings reset")
-      }
-
-      // Step 2: Delete all matches (due to foreign key constraints with teams)
-      const { error: matchError } = await supabase.from("matches").delete().gte("id", 0)
+      // Step 2: Delete all matches for this tournament
+      const { error: matchError } = await supabase
+        .from("matches")
+        .delete()
+        .eq("tournament_id", tournamentId)
+      
       if (matchError) {
         console.error("❌ Error deleting matches:", matchError)
         throw matchError
       }
       console.log("✅ All matches deleted")
 
-      // Step 3: Now safe to delete all teams (no foreign key references left)
-      const { error: teamError } = await supabase.from("teams").delete().gte("id", 0)
+      // Step 3: Delete all teams for this tournament
+      const { error: teamError } = await supabase
+        .from("teams")
+        .delete()
+        .eq("tournament_id", tournamentId)
+      
       if (teamError) {
         console.error("❌ Error deleting teams:", teamError)
         throw teamError
       }
       console.log("✅ All teams deleted")
 
+      // Step 4: Reset tournament phase
+      const { error: phaseError } = await supabase
+        .from("tournaments")
+        .update({ current_phase: "registration" })
+        .eq("id", tournamentId)
+      
+      if (phaseError) {
+        console.error("❌ Error resetting tournament phase:", phaseError)
+        throw phaseError
+      }
+
       console.log("✅ Tournament reset successfully!")
       
       // Manually reload all data to update UI
       console.log("🔄 Manually reloading all data for UI update...")
       await Promise.all([
+        loadTournaments(),
         loadTeams(),
         loadMatches(), 
         loadTournamentSettings()
@@ -627,6 +722,8 @@ export function useTournamentData() {
   }
 
   return {
+    tournaments,
+    pendingRegistrations,
     teams,
     poolPlayMatches,
     knockoutMatches,
@@ -636,7 +733,9 @@ export function useTournamentData() {
     connectionStatus,
     realtimeConnected,
     subscriptions,
-    isPolling,
+    createTournament,
+    updateTournament,
+    deleteTournament,
     addTeam,
     updateTeam,
     deleteTeam,
@@ -645,5 +744,9 @@ export function useTournamentData() {
     updateTournamentPhase,
     setByeTeamId,
     resetTournament,
+    loadTournaments,
+    loadPendingRegistrations,
+    loadTeams,
+    loadMatches,
   }
 }

@@ -14,9 +14,80 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 export type Database = {
   public: {
     Tables: {
+      tournaments: {
+        Row: {
+          id: number
+          name: string
+          date: string
+          status: 'upcoming' | 'active' | 'completed'
+          current_phase: 'registration' | 'pool-play' | 'knockout'
+          bye_team_id: number | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          name: string
+          date: string
+          status?: 'upcoming' | 'active' | 'completed'
+          current_phase?: 'registration' | 'pool-play' | 'knockout'
+          bye_team_id?: number | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          name?: string
+          date?: string
+          status?: 'upcoming' | 'active' | 'completed'
+          current_phase?: 'registration' | 'pool-play' | 'knockout'
+          bye_team_id?: number | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      pending_team_registrations: {
+        Row: {
+          id: number
+          tournament_id: number
+          team_name: string
+          players: string[]
+          contact_info: string | null
+          status: 'pending' | 'approved' | 'rejected'
+          admin_notes: string | null
+          submitted_at: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+        }
+        Insert: {
+          id?: number
+          tournament_id: number
+          team_name: string
+          players: string[]
+          contact_info?: string | null
+          status?: 'pending' | 'approved' | 'rejected'
+          admin_notes?: string | null
+          submitted_at?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+        }
+        Update: {
+          id?: number
+          tournament_id?: number
+          team_name?: string
+          players?: string[]
+          contact_info?: string | null
+          status?: 'pending' | 'approved' | 'rejected'
+          admin_notes?: string | null
+          submitted_at?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+        }
+      }
       teams: {
         Row: {
           id: number
+          tournament_id: number
           name: string
           players: string[]
           paid: boolean
@@ -28,6 +99,7 @@ export type Database = {
         }
         Insert: {
           id?: number
+          tournament_id: number
           name: string
           players: string[]
           paid?: boolean
@@ -39,6 +111,7 @@ export type Database = {
         }
         Update: {
           id?: number
+          tournament_id?: number
           name?: string
           players?: string[]
           paid?: boolean
@@ -52,6 +125,7 @@ export type Database = {
       matches: {
         Row: {
           id: number
+          tournament_id: number
           team1_id: number
           team2_id: number
           team1_score: number
@@ -64,6 +138,7 @@ export type Database = {
         }
         Insert: {
           id?: number
+          tournament_id: number
           team1_id: number
           team2_id: number
           team1_score?: number
@@ -76,6 +151,7 @@ export type Database = {
         }
         Update: {
           id?: number
+          tournament_id?: number
           team1_id?: number
           team2_id?: number
           team1_score?: number

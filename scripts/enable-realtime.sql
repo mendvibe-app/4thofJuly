@@ -1,6 +1,12 @@
 -- Enable real-time for tournament tables
 -- Run this script in your Supabase SQL editor
 
+-- Enable real-time for tournaments table
+ALTER publication supabase_realtime ADD TABLE tournaments;
+
+-- Enable real-time for pending_team_registrations table
+ALTER publication supabase_realtime ADD TABLE pending_team_registrations;
+
 -- Enable real-time for teams table
 ALTER publication supabase_realtime ADD TABLE teams;
 
@@ -17,4 +23,4 @@ WHERE pubname = 'supabase_realtime';
 
 -- If you see an error about supabase_realtime publication not existing, 
 -- create it first:
--- CREATE PUBLICATION supabase_realtime FOR TABLE teams, matches, tournament_settings; 
+-- CREATE PUBLICATION supabase_realtime FOR TABLE tournaments, pending_team_registrations, teams, matches, tournament_settings; 

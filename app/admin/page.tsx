@@ -5,17 +5,27 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Shield, LogOut, ArrowLeft, User } from "lucide-react"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Shield, LogOut, ArrowLeft, User, Trophy, Users, Clock } from "lucide-react"
 import { useAdmin } from "@/hooks/use-admin"
 import { useRouter } from "next/navigation"
+import { useTournamentData } from "@/hooks/use-tournament-data"
+import AdminTournamentManagement from "@/components/admin-tournament-management"
+import AdminPendingRegistrations from "@/components/admin-pending-registrations"
 
-export default function AdminLoginPage() {
+export default function AdminPage() {
   const [adminPasscode, setAdminPasscode] = useState('')
   const [adminName, setAdminName] = useState('')
   const [adminError, setAdminError] = useState('')
   const router = useRouter()
   
   const { isAdmin, adminName: currentAdminName, loginAsAdmin, logoutAdmin } = useAdmin()
+  const { 
+    tournaments, 
+    pendingRegistrations, 
+    loadTournaments, 
+    loadPendingRegistrations 
+  } = useTournamentData()
 
   const handleAdminLogin = (e: React.FormEvent) => {
     e.preventDefault()
@@ -35,8 +45,6 @@ export default function AdminLoginPage() {
     if (!success) {
       setAdminError('Invalid passcode')
       setAdminPasscode('')
-    } else {
-      router.push('/')
     }
   }
 
@@ -44,6 +52,12 @@ export default function AdminLoginPage() {
     logoutAdmin()
     router.push('/')
   }
+
+  const handleDataUpdated = async () => {
+    await Promise.all([loadTournaments(), loadPendingRegistrations()])
+  }
+
+  const pendingCount = pendingRegistrations.filter(r => r.status === 'pending').length
 
   return (
     <div className="min-h-screen bg-slate-900">
@@ -64,8 +78,22 @@ export default function AdminLoginPage() {
               
               <div className="flex items-center gap-2">
                 <Shield className="w-6 h-6 text-white" />
-                <h1 className="text-xl font-black text-white">Admin Login</h1>
+                <h1 className="text-xl font-black text-white">
+                  {isAdmin ? "Admin Dashboard" : "Admin Login"}
+                </h1>
               </div>
+              
+              {isAdmin && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleAdminLogout}
+                  className="text-white hover:bg-white/10 outdoor-text"
+                >
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Logout
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -73,44 +101,76 @@ export default function AdminLoginPage() {
 
       {/* Content */}
       <main className="p-4 pb-24">
-        <div className="max-w-md mx-auto mt-8">
-          {isAdmin ? (
-            <Card className="tournament-card">
-              <CardHeader>
-                <CardTitle className="text-center text-green-700">
-                  <Shield className="w-8 h-8 mx-auto mb-2" />
-                  Admin Mode Active
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center gap-3 p-4 bg-green-50 rounded-lg border border-green-200">
-                  <User className="w-5 h-5 text-green-600" />
-                  <div>
-                    <p className="font-medium text-green-900">Logged in as:</p>
-                    <p className="text-lg font-bold text-green-700">{currentAdminName}</p>
+        {isAdmin ? (
+          <div className="max-w-6xl mx-auto mt-8">
+            {/* Admin Header */}
+            <div className="mb-8">
+              <Card className="tournament-card">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-green-500 rounded-xl text-white">
+                        <Shield className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <h2 className="text-xl font-bold text-slate-900">Admin Dashboard</h2>
+                        <p className="text-slate-600">Logged in as <strong>{currentAdminName}</strong></p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex gap-4">
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-purple-600">{tournaments.length}</div>
+                        <div className="text-sm text-slate-600">Tournaments</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-yellow-600">{pendingCount}</div>
+                        <div className="text-sm text-slate-600">Pending</div>
+                      </div>
+                    </div>
                   </div>
-                </div>
-                
-                <div className="space-y-2">
-                  <Button
-                    onClick={() => router.push('/')}
-                    className="w-full h-14 outdoor-text bg-blue-600 hover:bg-blue-700"
-                  >
-                    Go to Tournament
-                  </Button>
-                  
-                  <Button
-                    onClick={handleAdminLogout}
-                    variant="outline"
-                    className="w-full h-14 outdoor-text border-red-300 text-red-700 hover:bg-red-50"
-                  >
-                    <LogOut className="w-5 h-5 mr-2" />
-                    Logout Admin
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Admin Tabs */}
+            <Tabs defaultValue="tournaments" className="space-y-6">
+              <TabsList className="grid w-full grid-cols-2 h-14">
+                <TabsTrigger value="tournaments" className="outdoor-text flex items-center gap-2">
+                  <Trophy className="w-4 h-4" />
+                  Tournament Management
+                </TabsTrigger>
+                <TabsTrigger value="registrations" className="outdoor-text flex items-center gap-2">
+                  <Users className="w-4 h-4" />
+                  Pending Registrations
+                  {pendingCount > 0 && (
+                    <span className="ml-2 bg-yellow-500 text-white text-xs rounded-full px-2 py-0.5">
+                      {pendingCount}
+                    </span>
+                  )}
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="tournaments" className="space-y-6">
+                <AdminTournamentManagement
+                  tournaments={tournaments}
+                  onTournamentCreated={handleDataUpdated}
+                  onTournamentUpdated={handleDataUpdated}
+                  onTournamentDeleted={handleDataUpdated}
+                />
+              </TabsContent>
+
+              <TabsContent value="registrations" className="space-y-6">
+                <AdminPendingRegistrations
+                  pendingRegistrations={pendingRegistrations}
+                  tournaments={tournaments}
+                  onRegistrationUpdated={handleDataUpdated}
+                />
+              </TabsContent>
+            </Tabs>
+          </div>
+        ) : (
+          <div className="max-w-md mx-auto mt-8">
             <Card className="tournament-card">
               <CardHeader>
                 <CardTitle className="text-center text-slate-700">
@@ -163,13 +223,13 @@ export default function AdminLoginPage() {
                 <div className="mt-6 p-4 bg-slate-50 rounded-lg border border-slate-200">
                   <h3 className="font-medium text-slate-700 mb-2">Admin Access</h3>
                   <p className="text-sm text-slate-600">
-                    Admin access allows you to manage tournament settings, edit team information, and control tournament flow.
+                    Admin access allows you to manage tournaments, approve team registrations, and control tournament flow.
                   </p>
                 </div>
               </CardContent>
             </Card>
-          )}
-        </div>
+          </div>
+        )}
       </main>
     </div>
   )
