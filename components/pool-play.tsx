@@ -15,7 +15,7 @@ interface PoolPlayProps {
   teams: Team[]
   matches: Match[]
   updateMatch: (matchId: number, updates: Partial<Match>) => Promise<void>
-  createMatches: (matches: Omit<Match, "id">[]) => Promise<void>
+  createMatches: (matches: Array<Omit<Match, "id" | "tournamentId" | "tournament"> & { tournamentId?: number }>) => Promise<void>
   onAdvanceToKnockout: () => void
   setByeTeamId: (teamId: number | null) => Promise<void>
   resetTournament?: () => Promise<void>
@@ -272,7 +272,7 @@ export default function PoolPlay({
       console.log(`📋 Generated ${allNeededMatches.length} total matches. Now creating optimal schedule...`)
       
       // Step 2: Create optimal schedule - spread teams out to avoid back-to-back games
-      const scheduledMatches: Omit<Match, "id">[] = []
+      const scheduledMatches: Array<Omit<Match, "id" | "tournamentId" | "tournament"> & { tournamentId?: number }> = []
       const remainingMatches = [...allNeededMatches]
       const teamLastPlayedRound = new Map<number, number>() // Track when each team last played
       
@@ -526,7 +526,7 @@ export default function PoolPlay({
       }
 
       // Create first round matches with proper seeding
-      const knockoutMatches: Omit<Match, "id">[] = []
+      const knockoutMatches: Array<Omit<Match, "id" | "tournamentId" | "tournament"> & { tournamentId?: number }> = []
       const numMatches = Math.floor(playingTeams.length / 2)
 
       console.log(`🎯 Creating ${numMatches} first round matches from ${playingTeams.length} playing teams:`)

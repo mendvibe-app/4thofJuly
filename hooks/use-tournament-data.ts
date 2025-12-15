@@ -17,6 +17,7 @@ export function useTournamentData() {
   const [connectionStatus, setConnectionStatus] = useState<"connecting" | "connected" | "error">("connecting")
   const [realtimeConnected, setRealtimeConnected] = useState(false)
   const [subscriptions, setSubscriptions] = useState<RealtimeChannel[]>([])
+  const [primaryTournamentId, setPrimaryTournamentId] = useState<number | null>(null)
 
   // Load initial data
   useEffect(() => {
@@ -150,6 +151,50 @@ export function useTournamentData() {
     }
   }, [])
 
+  // Get or create primary tournament
+  const ensurePrimaryTournament = async (): Promise<number> => {
+    try {
+      // Check if we already have a primary tournament ID
+      if (primaryTournamentId) return primaryTournamentId
+
+      // Try to get existing tournaments
+      const { data, error } = await supabase
+        .from("tournaments")
+        .select("*")
+        .order("date", { ascending: false })
+        .limit(1)
+
+      if (error && error.code !== "42P01") throw error
+
+      // If tournament exists, use it
+      if (data && data.length > 0) {
+        setPrimaryTournamentId(data[0].id)
+        return data[0].id
+      }
+
+      // Create a new primary tournament
+      const { data: newTournament, error: createError } = await supabase
+        .from("tournaments")
+        .insert({
+          name: "4th of July Invitational 2025",
+          date: new Date().toISOString().split('T')[0],
+          status: "active",
+          current_phase: "registration",
+        })
+        .select()
+        .single()
+
+      if (createError) throw createError
+
+      setPrimaryTournamentId(newTournament.id)
+      return newTournament.id
+    } catch (error) {
+      console.error("❌ Error ensuring primary tournament:", error)
+      // Return a fallback ID
+      return 1
+    }
+  }
+
   // Enhanced data loading with better error handling
   const loadTournamentData = useCallback(async () => {
     console.log("🚀 Loading tournament data...")
@@ -157,6 +202,9 @@ export function useTournamentData() {
     setConnectionStatus("connecting")
 
     try {
+      // Ensure primary tournament exists first
+      await ensurePrimaryTournament()
+      
       await Promise.all([
         loadTournaments(),
         loadPendingRegistrations(),
@@ -477,16 +525,17 @@ export function useTournamentData() {
   }
 
   const addTeam = async (team: Omit<Team, "id">) => {
+    const tournamentId = await ensurePrimaryTournament()
     console.log("➕ Adding team:", team.name)
     const { error } = await supabase.from("teams").insert({
-      tournament_id: team.tournamentId,
+      tournament_id: team.tournamentId || tournamentId,
       name: team.name,
       players: team.players,
       paid: team.paid,
-      wins: team.wins,
-      losses: team.losses,
-      points_for: team.pointsFor,
-      points_against: team.pointsAgainst,
+      wins: team.wins || 0,
+      losses: team.losses || 0,
+      points_for: team.pointsFor || 0,
+      points_against: team.pointsAgainst || 0,
     })
 
     if (error) {
@@ -584,18 +633,19 @@ export function useTournamentData() {
     await loadMatches()
   }
 
-  // Create matches for a specific tournament
-  const createMatches = async (tournamentId: number, matches: Array<{ team1Id: number; team2Id: number; phase: "pool-play" | "knockout"; round?: number }>) => {
+  // Create matches - simple version for single tournament
+  const createMatches = async (matches: Array<Omit<Match, "id" | "tournamentId" | "tournament"> & { tournamentId?: number }>) => {
+    const tournamentId = await ensurePrimaryTournament()
     console.log(`🎯 Creating ${matches.length} matches for tournament ${tournamentId}...`)
 
     try {
       const matchInserts = matches.map((match) => ({
-        tournament_id: tournamentId,
-        team1_id: match.team1Id,
-        team2_id: match.team2Id,
-        team1_score: 0,
-        team2_score: 0,
-        completed: false,
+        tournament_id: match.tournamentId || tournamentId,
+        team1_id: match.team1.id,
+        team2_id: match.team2.id,
+        team1_score: match.team1Score || 0,
+        team2_score: match.team2Score || 0,
+        completed: match.completed || false,
         phase: match.phase,
         round: match.round || null,
       }))
@@ -615,7 +665,8 @@ export function useTournamentData() {
     }
   }
 
-  const updateTournamentPhase = async (tournamentId: number, phase: TournamentPhase) => {
+  const updateTournamentPhase = async (phase: TournamentPhase) => {
+    const tournamentId = await ensurePrimaryTournament()
     console.log(`🔄 Updating tournament ${tournamentId} phase to:`, phase)
 
     try {
@@ -629,6 +680,8 @@ export function useTournamentData() {
         throw error
       }
 
+      // Also update local state immediately
+      setCurrentPhase(phase)
       console.log("✅ Tournament phase updated successfully!")
       await loadTournaments()
     } catch (error) {
@@ -637,7 +690,8 @@ export function useTournamentData() {
     }
   }
 
-  const setByeTeamId = async (tournamentId: number, teamId: number | null) => {
+  const setByeTeamId = async (teamId: number | null) => {
+    const tournamentId = await ensurePrimaryTournament()
     console.log(`🔄 Setting bye team for tournament ${tournamentId}:`, teamId)
 
     try {
@@ -659,7 +713,8 @@ export function useTournamentData() {
     }
   }
 
-  const resetTournament = async (tournamentId: number) => {
+  const resetTournament = async () => {
+    const tournamentId = await ensurePrimaryTournament()
     console.log(`🔄 Resetting tournament ${tournamentId}...`)
 
     try {

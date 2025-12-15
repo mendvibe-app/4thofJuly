@@ -14,7 +14,7 @@ interface KnockoutBracketProps {
   matches: Match[]
   poolPlayMatches: Match[]
   updateMatch: (matchId: number, updates: Partial<Match>) => Promise<void>
-  createMatches: (matches: Omit<Match, "id">[]) => Promise<void>
+  createMatches: (matches: Array<Omit<Match, "id" | "tournamentId" | "tournament"> & { tournamentId?: number }>) => Promise<void>
   byeTeam: Team | null
   allTeams: Team[]  // Add all teams for better bye display
 }
@@ -241,7 +241,7 @@ export default function KnockoutBracket({ matches, poolPlayMatches, updateMatch,
             winners.sort((a, b) => getSeedNumber(a) - getSeedNumber(b))
             
             // Create next round matches
-            const nextRoundMatchesToCreate: Omit<Match, "id">[] = []
+            const nextRoundMatchesToCreate: Array<Omit<Match, "id" | "tournamentId" | "tournament"> & { tournamentId?: number }> = []
             for (let i = 0; i < winners.length / 2; i++) {
               const team1 = winners[i]
               const team2 = winners[winners.length - 1 - i]
