@@ -1,60 +1,71 @@
-# 4th of July Soccer Tennis Tournament App
+# Harbor Way 4th of July Soccer Tennis
 
-## Project Overview
-This is a tournament management app for the annual Harbor Way 4th of July Soccer Tennis Tournament. The app handles team registration, payment tracking, pool play (round robin), knockout brackets, and live scoring.
+Tournament day app for the Harbor Way invitational: registration, pool play, knockout, and live scoring.
 
-## Current Status
-- Built initially in v0.dev (50 versions of iteration)
-- Connected to Supabase for real-time database
-- Deployed on Vercel with GitHub integration
-- Recently migrated to local development with Cursor
+## Stack
 
-## Key Features Implemented
-1. **Team Registration**: Add teams with player names and payment tracking ($40/team)
-2. **Pool Play**: Round robin format ensuring 3+ games per team
-3. **Knockout Bracket**: Single elimination with proper seeding
-4. **Live Scoring**: Real-time score updates via Supabase
-5. **Mobile Optimized**: Designed for outdoor tournament use
+- **Next.js 15** (App Router) + TypeScript + React 19
+- **Supabase** (Postgres + Realtime) via browser anon key
+- **Tailwind CSS** + Radix UI
+- **Vitest** for domain logic tests
+- **Vercel** for hosting
 
-## Current Teams Registered (6 total)
-1. "In it to Win it" - Mikey & Lance
-2. "Bangin' Aces" - Koji & Banghart  
-3. "Guadalajara" - Richie & Jario
-4. "Izzy Does It" - Matt & Izzy
-5. "Dream Team" - Abe & Nick
-6. "A to Z" - Z. Speed & A. Speed (defending champions)
+## Architecture (post-cleanup)
 
-## Technical Stack
-- Next.js 14 with TypeScript
-- React with hooks for state management
-- Supabase for real-time database
-- Tailwind CSS for styling
-- Vercel for deployment
+| Concern | Where |
+|---|---|
+| Shared data / realtime | `hooks/use-tournament-data.tsx` (`TournamentDataProvider`) |
+| Registration validation | `lib/registration.ts` |
+| Pool schedule + standings | `lib/pool-play/` |
+| Knockout seeding / byes | `lib/knockout/` |
+| Live match helpers | `lib/live/` |
+| Primary tournament pick | `lib/tournaments/` |
+| Scoring constants (11 win-by-2) | `lib/scoring.ts` |
+| Admin session | `hooks/use-admin.tsx` + `ADMIN_SYSTEM.md` |
 
-## Database Schema (Supabase)
-- `teams` table: id, name, player1, player2, paid, created_at
-- `matches` table: id, team1_id, team2_id, score1, score2, completed, round_type, round_number
-- `tournament_settings` table: current_phase, pool_play_complete, knockout_started
+**Single-active tournament:** the live UI, scores, pending queue, and public signup are scoped to one primary tournament (`status=active`, else latest date). Switch it from Admin → Tournament Management → **Make Active**.
 
-## Known Issues from v0 Development
-- Import path issues with `@/hooks/use-tournament-data`
-- Supabase connection intermittently fails
-- Pool play bracket generation logic needs refinement
-- Mobile responsiveness on score input could be improved
+**Trust model:** client-only Supabase with open RLS by design. Real write protection is the admin passcode + `requireAdmin()` UI gates. See `ADMIN_SYSTEM.md`.
 
-## Files Structure
-- `app/page.tsx` - Main tournament interface
-- `hooks/use-tournament-data.ts` - Supabase integration hook
-- `lib/supabase.ts` - Supabase client configuration
-- `components/` - Reusable UI components
-- `scripts/create-tables.sql` - Database schema
+## Routes
 
-## Environment Variables Needed
-- NEXT_PUBLIC_SUPABASE_URL
-- NEXT_PUBLIC_SUPABASE_ANON_KEY
+| Path | Purpose |
+|---|---|
+| `/` | Main tournament UI (phase-driven) |
+| `/register` | Public team signup (queued for approval) |
+| `/admin` | Admin login + tournament / registration management |
+| `/standings` | Standings view |
+| `/rules` | Tournament rules |
 
-## Tournament Rules
-- Soccer tennis with drinking rules
-- Guarantee 3+ games per team
-- Pool play for seeding, then knockout
-- $20/player entry ($10 pizza, $10 prize pool)
+## Phases
+
+1. **Registration** — approve teams, track paid
+2. **Pool play** — round robin, live scores, standings
+3. **Knockout** — seeded bracket with byes as needed
+
+## Local development
+
+```bash
+cp .env.example .env.local
+# fill NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY
+# optional locally: NEXT_PUBLIC_ADMIN_PASSCODE
+
+npm install
+npm run dev
+```
+
+Tests: `npm test` · Production build: `npm run build`
+
+Database: run `scripts/create-tables.sql` (and realtime scripts if needed) in the Supabase SQL editor. Details in `SETUP_GUIDE.md`. Day-of: `TOURNAMENT_DAY.md`.
+
+## Docs map
+
+- `TOURNAMENT_DAY.md` — merge order, smoke test, roles
+- `SETUP_GUIDE.md` — local env + DB
+- `DEPLOYMENT_GUIDE.md` — Vercel + production checklist
+- `ADMIN_SYSTEM.md` — passcode, gates, trust model, single-active
+- `REALTIME_SETUP.md` — realtime publication + polling fallback
+
+## Cleanup history
+
+Stacked hardening PRs: foundation/data → admin/security → registration → pool → knockout → live UX → multi-tournament → docs/polish → tournament-day → ops (API/RLS foundation).

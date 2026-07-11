@@ -1,111 +1,76 @@
 # Tournament App Setup Guide
 
-## 🔥 Critical Issues Found & Solutions
+## Prerequisites
 
-### 1. **Environment Variables Missing** ❌
-**Problem**: Supabase connection will fail without proper environment variables.
+- Node.js 20+
+- A Supabase project
+- Optional: Vercel account for deploy
 
-**Solution**: Create a `.env.local` file in the root directory with:
+## 1. Environment
+
 ```bash
-NEXT_PUBLIC_SUPABASE_URL=your_actual_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_actual_supabase_anon_key
+cp .env.example .env.local
 ```
 
-**How to get these values**:
-1. Go to [Supabase Dashboard](https://supabase.com/dashboard)
-2. Select your project (or create a new one)
-3. Go to Settings → API
-4. Copy the Project URL and anon/public key
+Set:
 
-### 2. **Database Tables Missing** ❌
-**Problem**: Database tables don't exist yet.
-
-**Solution**: Run the SQL script in Supabase:
-1. Go to your Supabase project → SQL Editor
-2. Copy and paste the contents of `scripts/create-tables.sql`
-3. Click "Run" to create all tables and policies
-
-### 3. **Import Paths** ✅
-**Status**: Actually working correctly! The `@/*` path mapping is properly configured.
-
-## 🚀 Step-by-Step Setup Process
-
-### Step 1: Environment Setup
-```bash
-# Create .env.local file (replace with your actual values)
-echo 'NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co' > .env.local
-echo 'NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here' >> .env.local
+```env
+NEXT_PUBLIC_SUPABASE_URL=...
+NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+NEXT_PUBLIC_ADMIN_PASSCODE=...   # optional locally; required in production
 ```
 
-### Step 2: Database Setup
-- Run the `scripts/create-tables.sql` in Supabase SQL Editor
-- This creates: teams, matches, tournament_settings tables
-- Sets up Row Level Security policies for public access
+Values: Supabase Dashboard → Project Settings → API.
 
-### Step 3: Test Connection
+## 2. Database
+
+In Supabase → SQL Editor, run:
+
+1. `scripts/create-tables.sql` — tables, RLS (public read/write by design), default active tournament
+2. `scripts/enable-realtime.sql` — add tables to `supabase_realtime` (or the alternative script)
+
+Tables used by the app:
+
+| Table | Role |
+|---|---|
+| `tournaments` | Phase, bye, status (primary source of truth) |
+| `teams` | Roster + paid + pool stats |
+| `matches` | Pool + knockout scores |
+| `pending_team_registrations` | Public signup queue |
+
+`tournament_settings` may still exist for legacy installs; the app reads phase/bye from `tournaments` only.
+
+## 3. Install & run
+
 ```bash
+npm install
 npm run dev
 ```
-- Open http://localhost:3000
-- Should see "🔴 LIVE Tournament - Everyone Can Participate!" if connected
-- Should see "❌ Database Connection Error" if environment/DB issues
 
-### Step 4: Test Tournament Flow
-1. **Registration Phase**: Add teams and mark them as paid
-2. **Pool Play**: Generate matches, input scores
-3. **Knockout**: Generate bracket, complete tournament
+- App: http://localhost:3000
+- Admin: http://localhost:3000/admin
+- Register: http://localhost:3000/register
 
-## 🔍 Debugging Checklist
+Connection badge in the UI: **LIVE** (realtime), **POLLING** (30s fallback), or **OFFLINE**.
 
-### Connection Issues
-- [ ] `.env.local` file exists with correct Supabase credentials
-- [ ] Database tables created via SQL script
-- [ ] Supabase project is active (not paused)
-- [ ] Check browser console for detailed error messages
+Day-of checklist: `TOURNAMENT_DAY.md`.
 
-### Import Issues
-- [ ] Run `npm run build` to check for TypeScript errors
-- [ ] Verify all components exist in `components/` directory
-- [ ] Check that `types/tournament.ts` exports are correct
+## 4. Smoke test
 
-### Database Issues
-- [ ] Run SQL script in Supabase SQL Editor
-- [ ] Check Supabase logs for connection attempts
-- [ ] Verify RLS policies allow public access
-- [ ] Test with simple SELECT query in Supabase
+1. Log in at `/admin` with the passcode
+2. Confirm one tournament is **Active** (Make Active if needed)
+3. Approve a pending registration or add a team from the main app
+4. Advance phase (admin only) → generate pool matches → enter scores
+5. Open a second browser (logged out) and confirm spectators cannot edit scores or change phase
 
-## 🎯 Key Features to Test
+## Troubleshooting
 
-1. **Team Registration**
-   - Add new teams
-   - Mark teams as paid ($40 each)
-   - Edit/delete teams
+| Symptom | Likely fix |
+|---|---|
+| Blank / connection error | Check `.env.local` and that the Supabase project is not paused |
+| Table does not exist | Re-run `scripts/create-tables.sql` |
+| Admin login disabled | Set `NEXT_PUBLIC_ADMIN_PASSCODE` (required in production) |
+| Scores not syncing | See `REALTIME_SETUP.md`; polling still updates every 30s |
+| Wrong teams/matches | Confirm the intended tournament is Active |
 
-2. **Pool Play**
-   - Generate round-robin matches
-   - Input live scores
-   - See real-time standings
-
-3. **Knockout Bracket**
-   - Generate bracket from pool standings
-   - Handle bye teams (if odd number)
-   - Complete tournament
-
-## 📱 Mobile Testing
-- Test on mobile device for outdoor tournament use
-- Verify score input is easy with touch interface
-- Check real-time updates work across devices
-
-## 🐛 Common Errors & Solutions
-
-**"Cannot read properties of undefined"**
-→ Environment variables not set
-
-**"Table 'teams' doesn't exist"**
-→ SQL script not run in Supabase
-
-**"Import path errors"**
-→ Actually false alarm - imports are working
-
-**"Connection timeout"**
-→ Check Supabase project status and network 
+More on admin trust model: `ADMIN_SYSTEM.md`.

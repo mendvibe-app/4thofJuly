@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -9,16 +9,25 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { CheckCircle, Users, Calendar, AlertCircle } from "lucide-react"
-import type { Tournament, PendingRegistration } from "@/types/tournament"
+import type { Tournament } from "@/types/tournament"
 import { supabase } from "@/lib/supabase"
+import {
+  MAX_TEAMS,
+  formatSupabaseError,
+  findDuplicateTeamName,
+  normalizeName,
+  validateTeamInput,
+} from "@/lib/registration"
 
 interface PublicTeamRegistrationProps {
   tournaments: Tournament[]
+  primaryTournamentId?: number | null
   onRegistrationSubmitted?: () => void
 }
 
 export default function PublicTeamRegistration({
   tournaments,
+  primaryTournamentId = null,
   onRegistrationSubmitted,
 }: PublicTeamRegistrationProps) {
   const [selectedTournamentId, setSelectedTournamentId] = useState<string>("")
@@ -28,78 +37,126 @@ export default function PublicTeamRegistration({
   const [contactInfo, setContactInfo] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  const [submittedTeamName, setSubmittedTeamName] = useState("")
   const [error, setError] = useState("")
 
-  // Auto-select active tournament if there's only one active
-  useEffect(() => {
-    const activeTournaments = tournaments.filter(t => t.status === 'active' || t.status === 'upcoming')
-    if (activeTournaments.length === 1) {
-      setSelectedTournamentId(activeTournaments[0].id.toString())
-    }
-  }, [tournaments])
+  // Public signup only for the live (primary/active) tournament while in registration
+  const availableTournaments = useMemo(() => {
+    return tournaments.filter((t) => {
+      if (t.currentPhase !== "registration") return false
+      if (primaryTournamentId != null) return t.id === primaryTournamentId
+      return t.status === "active"
+    })
+  }, [tournaments, primaryTournamentId])
 
-  const availableTournaments = tournaments.filter(
-    t => t.status === 'active' || t.status === 'upcoming'
+  // Prefer the primary tournament when it's open for registration
+  useEffect(() => {
+    if (availableTournaments.length === 0) {
+      setSelectedTournamentId("")
+      return
+    }
+
+    const primaryOpen = primaryTournamentId
+      ? availableTournaments.find((t) => t.id === primaryTournamentId)
+      : undefined
+
+    if (primaryOpen) {
+      setSelectedTournamentId(primaryOpen.id.toString())
+      return
+    }
+
+    if (availableTournaments.length === 1) {
+      setSelectedTournamentId(availableTournaments[0].id.toString())
+    }
+  }, [availableTournaments, primaryTournamentId])
+
+  const selectedTournament = availableTournaments.find(
+    (t) => t.id.toString() === selectedTournamentId,
   )
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
 
-    // Validation
     if (!selectedTournamentId) {
       setError("Please select a tournament")
       return
     }
-    if (!teamName.trim()) {
-      setError("Please enter a team name")
+
+    const validationError = validateTeamInput({ teamName, player1, player2 })
+    if (validationError) {
+      setError(validationError)
       return
     }
-    if (!player1.trim()) {
-      setError("Please enter the first player's name")
-      return
-    }
-    if (!player2.trim()) {
-      setError("Please enter the second player's name")
+
+    const tournamentId = Number.parseInt(selectedTournamentId, 10)
+    if (Number.isNaN(tournamentId)) {
+      setError("Invalid tournament selection")
       return
     }
 
     setIsSubmitting(true)
 
     try {
-      const { error: submitError } = await supabase
-        .from("pending_team_registrations")
-        .insert({
-          tournament_id: parseInt(selectedTournamentId),
-          team_name: teamName.trim(),
-          players: [player1.trim(), player2.trim()],
-          contact_info: contactInfo.trim() || null,
-          status: 'pending'
-        })
+      const [{ data: existingTeams, error: teamsError }, { data: pending, error: pendingError }] =
+        await Promise.all([
+          supabase
+            .from("teams")
+            .select("name")
+            .eq("tournament_id", tournamentId),
+          supabase
+            .from("pending_team_registrations")
+            .select("team_name, status")
+            .eq("tournament_id", tournamentId)
+            .eq("status", "pending"),
+        ])
 
-      if (submitError) {
-        throw submitError
+      if (teamsError) throw teamsError
+      if (pendingError) throw pendingError
+
+      const teamCount = existingTeams?.length ?? 0
+      if (teamCount >= MAX_TEAMS) {
+        setError(`This tournament is full (${MAX_TEAMS} teams max).`)
+        return
       }
 
-      // Reset form and show success
+      const duplicate = findDuplicateTeamName(teamName, [
+        ...(existingTeams ?? []).map((t) => t.name),
+        ...(pending ?? []).map((p) => p.team_name),
+      ])
+      if (duplicate) {
+        setError(
+          `${duplicate}. If you already submitted, wait for admin review or pick a different name.`,
+        )
+        return
+      }
+
+      const cleanName = normalizeName(teamName)
+      const cleanPlayers = [normalizeName(player1), normalizeName(player2)]
+
+      const { error: submitError } = await supabase.from("pending_team_registrations").insert({
+        tournament_id: tournamentId,
+        team_name: cleanName,
+        players: cleanPlayers,
+        contact_info: normalizeName(contactInfo) || null,
+        status: "pending",
+      })
+
+      if (submitError) throw submitError
+
+      setSubmittedTeamName(cleanName)
       setTeamName("")
       setPlayer1("")
       setPlayer2("")
       setContactInfo("")
-      setSelectedTournamentId("")
       setSubmitted(true)
-      
-      // Call callback if provided
+
       if (onRegistrationSubmitted) {
-        onRegistrationSubmitted()
+        await onRegistrationSubmitted()
       }
-
-      // Hide success message after 5 seconds
-      setTimeout(() => setSubmitted(false), 5000)
-
-    } catch (error) {
-      console.error("Error submitting registration:", error)
-      setError(error instanceof Error ? error.message : "Failed to submit registration")
+    } catch (submitErr) {
+      console.error("Error submitting registration:", submitErr)
+      setError(formatSupabaseError(submitErr, "Failed to submit registration"))
     } finally {
       setIsSubmitting(false)
     }
@@ -110,14 +167,16 @@ export default function PublicTeamRegistration({
     setPlayer1("")
     setPlayer2("")
     setContactInfo("")
-    setSelectedTournamentId("")
     setError("")
     setSubmitted(false)
+    setSubmittedTeamName("")
+    if (availableTournaments.length === 1) {
+      setSelectedTournamentId(availableTournaments[0].id.toString())
+    } else if (primaryTournamentId) {
+      const primaryOpen = availableTournaments.find((t) => t.id === primaryTournamentId)
+      setSelectedTournamentId(primaryOpen ? primaryOpen.id.toString() : "")
+    }
   }
-
-  const selectedTournament = availableTournaments.find(
-    t => t.id.toString() === selectedTournamentId
-  )
 
   if (availableTournaments.length === 0) {
     return (
@@ -125,9 +184,9 @@ export default function PublicTeamRegistration({
         <CardContent className="pt-6">
           <div className="text-center py-8">
             <Calendar className="w-12 h-12 mx-auto text-slate-400 mb-4" />
-            <h3 className="text-lg font-medium text-slate-900 mb-2">No Open Tournaments</h3>
+            <h3 className="text-lg font-medium text-slate-900 mb-2">Registration Closed</h3>
             <p className="text-slate-600">
-              There are currently no tournaments accepting registrations. Check back later!
+              There are currently no tournaments accepting new team registrations.
             </p>
           </div>
         </CardContent>
@@ -143,13 +202,18 @@ export default function PublicTeamRegistration({
             <CheckCircle className="w-16 h-16 mx-auto text-green-500 mb-4" />
             <h3 className="text-xl font-bold text-green-700 mb-2">Registration Submitted!</h3>
             <p className="text-slate-600 mb-4">
-              Your team registration has been submitted successfully. An admin will review your registration and you'll be notified once it's approved.
+              {submittedTeamName ? (
+                <>
+                  <strong>{submittedTeamName}</strong> is in the review queue. An admin will approve
+                  or reject it before the team is added to the tournament.
+                </>
+              ) : (
+                <>
+                  Your team registration has been submitted. An admin will review it before approval.
+                </>
+              )}
             </p>
-            <Button 
-              onClick={resetForm}
-              variant="outline"
-              className="outdoor-text"
-            >
+            <Button onClick={resetForm} variant="outline" className="outdoor-text">
               Submit Another Team
             </Button>
           </div>
@@ -168,18 +232,22 @@ export default function PublicTeamRegistration({
           Team Registration
         </CardTitle>
         <p className="text-slate-600 outdoor-text">
-          Register your team for an upcoming tournament. Your registration will be reviewed by an admin before approval.
+          Register your team for an upcoming tournament. An admin must approve your registration
+          before you appear on the roster. Entry is $40/team.
         </p>
       </CardHeader>
-      
+
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Tournament Selection */}
           <div>
             <Label htmlFor="tournament" className="outdoor-text font-medium">
               Tournament *
             </Label>
-            <Select value={selectedTournamentId} onValueChange={setSelectedTournamentId}>
+            <Select
+              value={selectedTournamentId}
+              onValueChange={setSelectedTournamentId}
+              disabled={availableTournaments.length === 1}
+            >
               <SelectTrigger className="mt-1 h-14 outdoor-text">
                 <SelectValue placeholder="Select a tournament" />
               </SelectTrigger>
@@ -190,8 +258,8 @@ export default function PublicTeamRegistration({
                       <span className="font-medium">{tournament.name}</span>
                       <span className="text-sm text-slate-500">
                         {new Date(tournament.date).toLocaleDateString()}
-                        {tournament.status === 'active' && ' • Currently Active'}
-                        {tournament.status === 'upcoming' && ' • Upcoming'}
+                        {tournament.status === "active" && " • Currently Active"}
+                        {tournament.status === "upcoming" && " • Upcoming"}
                       </span>
                     </div>
                   </SelectItem>
@@ -200,19 +268,18 @@ export default function PublicTeamRegistration({
             </Select>
           </div>
 
-          {/* Selected Tournament Info */}
           {selectedTournament && (
             <Alert>
               <Calendar className="h-4 w-4" />
               <AlertDescription>
-                <strong>{selectedTournament.name}</strong> - {new Date(selectedTournament.date).toLocaleDateString()}
+                <strong>{selectedTournament.name}</strong> —{" "}
+                {new Date(selectedTournament.date).toLocaleDateString()}
                 <br />
-                Current phase: {selectedTournament.currentPhase.replace('-', ' ')}
+                Open for registration
               </AlertDescription>
             </Alert>
           )}
 
-          {/* Team Name */}
           <div>
             <Label htmlFor="team-name" className="outdoor-text font-medium">
               Team Name *
@@ -225,10 +292,10 @@ export default function PublicTeamRegistration({
               placeholder="Enter your team name"
               className="mt-1 h-14 outdoor-text"
               maxLength={50}
+              autoComplete="organization"
             />
           </div>
 
-          {/* Player 1 */}
           <div>
             <Label htmlFor="player1" className="outdoor-text font-medium">
               Player 1 Name *
@@ -241,10 +308,10 @@ export default function PublicTeamRegistration({
               placeholder="Enter first player's name"
               className="mt-1 h-14 outdoor-text"
               maxLength={50}
+              autoComplete="name"
             />
           </div>
 
-          {/* Player 2 */}
           <div>
             <Label htmlFor="player2" className="outdoor-text font-medium">
               Player 2 Name *
@@ -257,10 +324,10 @@ export default function PublicTeamRegistration({
               placeholder="Enter second player's name"
               className="mt-1 h-14 outdoor-text"
               maxLength={50}
+              autoComplete="off"
             />
           </div>
 
-          {/* Contact Information */}
           <div>
             <Label htmlFor="contact-info" className="outdoor-text font-medium">
               Contact Information
@@ -276,11 +343,10 @@ export default function PublicTeamRegistration({
               maxLength={200}
             />
             <p className="text-sm text-slate-500 mt-1">
-              Provide contact info if you'd like updates on your registration status
+              Optional — helps admins reach you about approval or payment ($40/team).
             </p>
           </div>
 
-          {/* Error Display */}
           {error && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
@@ -288,11 +354,10 @@ export default function PublicTeamRegistration({
             </Alert>
           )}
 
-          {/* Submit Button */}
-          <Button 
-            type="submit" 
+          <Button
+            type="submit"
             className="w-full h-14 outdoor-text-large bg-blue-600 hover:bg-blue-700"
-            disabled={isSubmitting}
+            disabled={isSubmitting || !selectedTournamentId}
           >
             {isSubmitting ? (
               <>Submitting...</>
@@ -305,10 +370,10 @@ export default function PublicTeamRegistration({
           </Button>
 
           <p className="text-sm text-slate-500 text-center">
-            * Required fields. Your registration will be reviewed by an admin.
+            * Required fields. Max {MAX_TEAMS} teams. Your registration will be reviewed by an admin.
           </p>
         </form>
       </CardContent>
     </Card>
   )
-} 
+}

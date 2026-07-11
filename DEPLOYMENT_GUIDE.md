@@ -1,113 +1,53 @@
-# Deployment Guide - 4th of July Tournament App
+# Deployment Guide
 
-## Quick Deployment to Vercel (Recommended)
+## Vercel (recommended)
 
-### Option 1: Deploy via GitHub Integration (Easiest)
-
-1. **Go to Vercel.com**
-   - Visit [https://vercel.com](https://vercel.com)
-   - Sign up/login with your GitHub account
-
-2. **Import Your Project**
-   - Click "New Project"
-   - Select "Import Git Repository"
-   - Choose your repository: `mendvibe-app/4thofJuly`
-   - Click "Import"
-
-3. **Configure Environment Variables**
-   - In the Vercel dashboard, go to your project settings
-   - Add these environment variables:
-     ```
-     NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-     NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-     ```
-
-4. **Deploy**
-   - Vercel will automatically build and deploy
-   - You'll get a production URL like: `https://your-project-name.vercel.app`
-
-### Option 2: Deploy via Vercel CLI
-
-1. **Install Vercel CLI**
-   ```bash
-   npm install -g vercel
-   ```
-
-2. **Login to Vercel**
-   ```bash
-   vercel login
-   ```
-
-3. **Deploy**
-   ```bash
-   vercel --prod
-   ```
-
-## Alternative Deployment Options
-
-### Netlify
-1. Go to [https://netlify.com](https://netlify.com)
-2. Connect your GitHub repository
-3. Set build command: `npm run build`
-4. Set publish directory: `.next`
-5. Add environment variables
-
-### Manual Build & Deploy
-1. **Build the project**
-   ```bash
-   npm run build
-   ```
-
-2. **Start production server**
-   ```bash
-   npm start
-   ```
-
-## Environment Variables Required
-
-Make sure to set these in your production environment:
+1. Import `mendvibe-app/4thofJuly` in [Vercel](https://vercel.com)
+2. Set environment variables:
 
 ```env
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+NEXT_PUBLIC_SUPABASE_URL=...
+NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+NEXT_PUBLIC_ADMIN_PASSCODE=...   # required — login is disabled without it
 ```
 
-## Admin System - Production Notes
+3. Deploy. Pushes to `main` redeploy automatically; PRs get preview URLs.
 
-### Admin Passcode
-The admin system uses this passcode (you can change it in `hooks/use-admin.ts`):
-- `july4admin`
+CLI alternative:
 
-### Security Features
-- ✅ 48-hour session timeout
-- ✅ Client-side only (no database storage)
-- ✅ Multiple users can use same passcode
-- ✅ Easy passcode rotation
+```bash
+npm i -g vercel
+vercel login
+vercel --prod
+```
 
-### Production Checklist
-- [ ] Environment variables configured
-- [ ] Supabase database tables created
-- [ ] Admin passcode communicated to tournament staff
-- [ ] Real-time subscriptions enabled in Supabase
-- [ ] Test admin login on production site
-- [ ] Test score updates with admin access
+## Production checklist
 
-## Automatic Deployments
+- [ ] Env vars set (including admin passcode)
+- [ ] `scripts/create-tables.sql` applied in Supabase
+- [ ] `scripts/knockout-unique-index.sql` applied (blocks duplicate knockout pairs)
+- [ ] Realtime publication includes `tournaments`, `teams`, `matches`, `pending_team_registrations` (see `REALTIME_SETUP.md`)
+- [ ] One tournament marked **Active** in Admin
+- [ ] Admin login works on production
+- [ ] Logged-out browser cannot edit scores or change phase
+- [ ] Score update on admin device appears on spectator device (LIVE or within ~30s POLLING)
+- [ ] Passcode shared only with scorekeepers
+- [ ] Follow `TOURNAMENT_DAY.md` smoke list on the live URL
 
-Once connected to Vercel/Netlify:
-- Every push to `main` branch automatically deploys
-- Preview deployments for pull requests
-- Zero-downtime deployments
-- Global CDN distribution
+Optional later (server writes + RLS): `ADMIN_API_ENABLED`, service role key, then `scripts/tighten-rls.sql` — see `ADMIN_SYSTEM.md`.
 
-## Need Help?
+## Admin notes
 
-If you encounter issues:
-1. Check the build logs in your deployment platform
-2. Verify environment variables are set correctly
-3. Ensure Supabase connection is working
-4. Test admin functionality after deployment
+- Session lasts 48 hours in the browser (`localStorage`)
+- Mutating UI is gated with `requireAdmin()`
+- Spectators cannot advance phase via bottom nav
+- Knockout auto-advance runs only in admin browsers
+- Rotate passcode by changing the env var and redeploying
 
----
+Full trust model: `ADMIN_SYSTEM.md`.
 
-**Your tournament admin system is now ready for production! 🎆** 
+## If deploy fails
+
+1. Read the Vercel build log (`npm run build` must pass locally)
+2. Confirm env vars are present on the Production environment
+3. Confirm Supabase URL/key match the project that has the tables

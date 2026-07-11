@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Shield, LogOut, ArrowLeft, User, Trophy, Users, Clock } from "lucide-react"
+import { Shield, LogOut, ArrowLeft, Trophy, Users } from "lucide-react"
 import { useAdmin } from "@/hooks/use-admin"
 import { useRouter } from "next/navigation"
 import { useTournamentData } from "@/hooks/use-tournament-data"
@@ -19,17 +19,29 @@ export default function AdminPage() {
   const [adminError, setAdminError] = useState('')
   const router = useRouter()
   
-  const { isAdmin, adminName: currentAdminName, loginAsAdmin, logoutAdmin } = useAdmin()
-  const { 
-    tournaments, 
-    pendingRegistrations, 
-    loadTournaments, 
-    loadPendingRegistrations 
+  const { isAdmin, adminName: currentAdminName, loginAsAdmin, logoutAdmin, passcodeConfigured } = useAdmin()
+  const {
+    tournaments,
+    pendingRegistrations,
+    teams,
+    primaryTournamentId,
+    createTournament,
+    updateTournament,
+    deleteTournament,
+    setActiveTournament,
+    loadTournaments,
+    loadPendingRegistrations,
+    loadTeams,
   } = useTournamentData()
 
   const handleAdminLogin = (e: React.FormEvent) => {
     e.preventDefault()
     setAdminError('')
+
+    if (!passcodeConfigured) {
+      setAdminError('Admin passcode is not configured. Set NEXT_PUBLIC_ADMIN_PASSCODE.')
+      return
+    }
 
     if (!adminPasscode.trim()) {
       setAdminError('Please enter passcode')
@@ -54,7 +66,7 @@ export default function AdminPage() {
   }
 
   const handleDataUpdated = async () => {
-    await Promise.all([loadTournaments(), loadPendingRegistrations()])
+    await Promise.all([loadTournaments(), loadPendingRegistrations(), loadTeams()])
   }
 
   const pendingCount = pendingRegistrations.filter(r => r.status === 'pending').length
@@ -154,9 +166,11 @@ export default function AdminPage() {
               <TabsContent value="tournaments" className="space-y-6">
                 <AdminTournamentManagement
                   tournaments={tournaments}
-                  onTournamentCreated={handleDataUpdated}
-                  onTournamentUpdated={handleDataUpdated}
-                  onTournamentDeleted={handleDataUpdated}
+                  primaryTournamentId={primaryTournamentId}
+                  createTournament={createTournament}
+                  updateTournament={updateTournament}
+                  deleteTournament={deleteTournament}
+                  setActiveTournament={setActiveTournament}
                 />
               </TabsContent>
 
@@ -164,6 +178,7 @@ export default function AdminPage() {
                 <AdminPendingRegistrations
                   pendingRegistrations={pendingRegistrations}
                   tournaments={tournaments}
+                  teams={teams}
                   onRegistrationUpdated={handleDataUpdated}
                 />
               </TabsContent>
@@ -211,9 +226,17 @@ export default function AdminPage() {
                     </div>
                   )}
 
+                  {!passcodeConfigured && (
+                    <div className="text-sm text-amber-800 bg-amber-50 p-3 rounded-lg border border-amber-200">
+                      Production admin login is disabled until{" "}
+                      <code className="font-mono text-xs">NEXT_PUBLIC_ADMIN_PASSCODE</code> is set.
+                    </div>
+                  )}
+
                   <Button 
                     type="submit" 
                     className="w-full h-14 outdoor-text bg-blue-600 hover:bg-blue-700"
+                    disabled={!passcodeConfigured}
                   >
                     <Shield className="w-5 h-5 mr-2" />
                     Login as Admin
@@ -224,6 +247,7 @@ export default function AdminPage() {
                   <h3 className="font-medium text-slate-700 mb-2">Admin Access</h3>
                   <p className="text-sm text-slate-600">
                     Admin access allows you to manage tournaments, approve team registrations, and control tournament flow.
+                    Share the passcode only with trusted scorekeepers.
                   </p>
                 </div>
               </CardContent>

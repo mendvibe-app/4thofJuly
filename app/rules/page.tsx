@@ -8,7 +8,7 @@ import { useTournamentData } from "@/hooks/use-tournament-data"
 
 export default function RulesPage() {
   const router = useRouter()
-  const { teams, poolPlayMatches, currentPhase, updateTournamentPhase } = useTournamentData()
+  const { teams, poolPlayMatches, currentPhase } = useTournamentData()
 
   const navigationItems = [
     { id: "registration", label: "Teams", icon: Users, badge: teams.length },
@@ -266,16 +266,13 @@ export default function RulesPage() {
               <button
                 key={item.id}
                 onClick={() => {
-                  if (item.id === "rules") {
-                    // Already on rules page
-                    return
-                  }
+                  if (item.id === "rules") return
                   if (item.id === "standings") {
                     router.push("/standings")
                     return
                   }
+                  // Navigate home without mutating tournament phase
                   router.push("/")
-                  setTimeout(() => updateTournamentPhase(item.id as any), 100)
                 }}
                 className={`
                   bottom-nav-item relative

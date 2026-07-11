@@ -1,45 +1,51 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 
-import { 
-  Users, 
-  Trophy, 
-  DollarSign, 
-  Play, 
-  Wifi, 
-  WifiOff, 
-  AlertCircle, 
-  Radio,
-  Home,
+import {
+  Users,
+  Trophy,
+  DollarSign,
+  Play,
   Settings,
   BarChart3,
   Flag,
   Menu,
   X,
-      Shield,
-    LogOut
+  Shield,
+  LogOut,
+  Eye,
 } from "lucide-react"
 import TeamRegistration from "@/components/team-registration"
 import PoolPlay from "@/components/pool-play"
 import KnockoutBracket from "@/components/knockout-bracket"
-import NCAABracket from "@/components/ncaa-bracket"
 import LiveBanner from "@/components/live-banner"
+import { ConnectionStatusBadge } from "@/components/connection-status-badge"
 import { useTournamentData } from "@/hooks/use-tournament-data"
 import { useAdmin } from "@/hooks/use-admin"
+import type { TournamentPhase } from "@/types/tournament"
+import Link from "next/link"
+
+const PHASES: TournamentPhase[] = ["registration", "pool-play", "knockout"]
+
+function isTournamentPhase(value: string): value is TournamentPhase {
+  return PHASES.includes(value as TournamentPhase)
+}
 
 export default function TournamentApp() {
   const [showMobileMenu, setShowMobileMenu] = useState(false)
-  
+  const [viewPhase, setViewPhase] = useState<TournamentPhase>("registration")
+
   const {
     teams,
     poolPlayMatches,
     knockoutMatches,
     currentPhase,
     byeTeam,
+    primaryTournamentId,
     loading,
     connectionStatus,
     realtimeConnected,
@@ -52,20 +58,63 @@ export default function TournamentApp() {
     updateTournamentPhase,
     setByeTeamId,
     resetTournament,
+    clearKnockoutMatches,
   } = useTournamentData()
 
-  const { isAdmin, adminName: currentAdminName, logoutAdmin } = useAdmin()
+  const { isAdmin, adminName: currentAdminName, logoutAdmin, requireAdmin } = useAdmin()
+
+  // Follow DB phase when it changes (admin advance / remote update)
+  useEffect(() => {
+    setViewPhase(currentPhase)
+  }, [currentPhase])
 
   const handleAdminLogout = () => {
     logoutAdmin()
     setShowMobileMenu(false)
   }
 
+  const handleResetTournament = async () => {
+    if (!requireAdmin("reset the tournament")) return
+    if (!confirm("Reset the entire tournament? This deletes all teams and matches.")) {
+      return
+    }
+    setShowMobileMenu(false)
+    await resetTournament()
+  }
+
+  const handlePhaseNav = (phaseId: string) => {
+    if (!isTournamentPhase(phaseId)) return
+
+    if (isAdmin) {
+      if (!requireAdmin("change the tournament phase")) return
+      void updateTournamentPhase(phaseId)
+      return
+    }
+
+    // Spectators browse without mutating tournament phase
+    setViewPhase(phaseId)
+  }
+
   const totalCash = teams.filter((team) => team.paid).length * 40
   const paidTeams = teams.filter((team) => team.paid).length
 
   const renderPhaseContent = () => {
-    switch (currentPhase) {
+    if (!primaryTournamentId) {
+      return (
+        <div className="text-center space-y-4 py-10">
+          <Trophy className="w-12 h-12 mx-auto text-slate-400" />
+          <h3 className="text-xl font-bold text-slate-900">No active tournament</h3>
+          <p className="text-slate-600 max-w-md mx-auto">
+            An admin needs to create a tournament and mark it Active before the live app has data.
+          </p>
+          <Button asChild className="bg-blue-600 hover:bg-blue-700">
+            <Link href="/admin">Open Admin</Link>
+          </Button>
+        </div>
+      )
+    }
+
+    switch (viewPhase) {
       case "registration":
         return (
           <TeamRegistration
@@ -81,8 +130,10 @@ export default function TournamentApp() {
           <PoolPlay
             teams={teams}
             matches={poolPlayMatches}
+            knockoutMatches={knockoutMatches}
             updateMatch={updateMatch}
             createMatches={createMatches}
+            clearKnockoutMatches={clearKnockoutMatches}
             onAdvanceToKnockout={() => updateTournamentPhase("knockout")}
             setByeTeamId={setByeTeamId}
             resetTournament={resetTournament}
@@ -105,7 +156,7 @@ export default function TournamentApp() {
   }
 
   const getPhaseTitle = () => {
-    switch (currentPhase) {
+    switch (viewPhase) {
       case "registration":
         return "Team Registration"
       case "pool-play":
@@ -118,7 +169,7 @@ export default function TournamentApp() {
   }
 
   const getPhaseIcon = () => {
-    switch (currentPhase) {
+    switch (viewPhase) {
       case "registration":
         return <Users className="w-6 h-6" />
       case "pool-play":
@@ -130,56 +181,29 @@ export default function TournamentApp() {
     }
   }
 
-  const getConnectionStatus = () => {
-    const baseClasses = "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all duration-300 border-2 shadow-lg"
-    
-    switch (connectionStatus) {
-      case "connected":
-        return (
-          <div className={`${baseClasses} bg-green-400 text-white border-white animate-pulse`}>
-            <Radio className="w-3 h-3" />
-            <span>LIVE</span>
-          </div>
-        )
-      case "error":
-        return (
-          <div className={`${baseClasses} bg-red-500 text-white border-white`}>
-            <WifiOff className="w-3 h-3" />
-            <span>OFFLINE</span>
-          </div>
-        )
-      default:
-        return (
-          <div className={`${baseClasses} bg-blue-400 text-white border-white animate-pulse`}>
-            <AlertCircle className="w-3 h-3" />
-            <span>CONNECTING</span>
-          </div>
-        )
-    }
-  }
-
   const navigationItems = [
-    { 
-      id: "registration", 
-      label: "Teams", 
+    {
+      id: "registration" as const,
+      label: "Teams",
       icon: Users,
       disabled: false,
-      badge: teams.length > 0 ? teams.length : null
+      badge: teams.length > 0 ? teams.length : null,
     },
-    { 
-      id: "pool-play", 
-      label: "Pool Play", 
+    {
+      id: "pool-play" as const,
+      label: "Pool Play",
       icon: Play,
-      disabled: teams.length < 4,
-      badge: poolPlayMatches.length > 0 ? poolPlayMatches.length : null
+      // Spectators can always browse; admins still blocked until enough teams
+      disabled: isAdmin && teams.length < 4,
+      badge: poolPlayMatches.length > 0 ? poolPlayMatches.length : null,
     },
-    { 
-      id: "knockout", 
-      label: "Knockout", 
+    {
+      id: "knockout" as const,
+      label: "Knockout",
       icon: Trophy,
-      disabled: poolPlayMatches.length === 0,
-      badge: knockoutMatches.length > 0 ? knockoutMatches.length : null
-    }
+      disabled: isAdmin && poolPlayMatches.length === 0,
+      badge: knockoutMatches.length > 0 ? knockoutMatches.length : null,
+    },
   ]
 
   if (loading) {
@@ -201,14 +225,23 @@ export default function TournamentApp() {
 
   return (
     <div className="min-h-screen bg-slate-900">
-      {/* Redesigned Header - Better Layout */}
       <header className="sticky-header usa-header-gradient">
         <div className="safe-area-top">
           <div className="px-4 py-4">
-            {/* Top Row - Connection Status and Menu */}
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
-                {getConnectionStatus()}
+                <ConnectionStatusBadge
+                  connectionStatus={connectionStatus}
+                  realtimeConnected={realtimeConnected}
+                  isPolling={isPolling}
+                  loading={loading}
+                />
+                {!isAdmin && (
+                  <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-white/15 text-white border border-white/30">
+                    <Eye className="w-3 h-3" />
+                    <span>SPECTATING</span>
+                  </div>
+                )}
               </div>
               <Button
                 variant="ghost"
@@ -216,15 +249,10 @@ export default function TournamentApp() {
                 onClick={() => setShowMobileMenu(!showMobileMenu)}
                 className="touch-target p-3 text-white hover:bg-white/20 rounded-xl"
               >
-                {showMobileMenu ? (
-                  <X className="w-6 h-6" />
-                ) : (
-                  <Menu className="w-6 h-6" />
-                )}
+                {showMobileMenu ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
               </Button>
             </div>
-            
-            {/* Main Title Section */}
+
             <div className="text-center space-y-1">
               <div className="flex items-center justify-center gap-2 mb-1">
                 <span className="text-2xl">🦅</span>
@@ -241,17 +269,22 @@ export default function TournamentApp() {
         </div>
       </header>
 
-      {/* Mobile Menu Overlay */}
       {showMobileMenu && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" onClick={() => setShowMobileMenu(false)}>
-          <div className="fixed top-0 right-0 h-full w-80 bg-white shadow-xl p-6 safe-area-top">
+        <div
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
+          onClick={() => setShowMobileMenu(false)}
+        >
+          <div
+            className="fixed top-0 right-0 h-full w-80 bg-white shadow-xl p-6 safe-area-top"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between mb-8">
               <h3 className="text-xl font-bold text-slate-900">Menu</h3>
               <Button variant="ghost" size="sm" onClick={() => setShowMobileMenu(false)}>
                 <X className="w-6 h-6" />
               </Button>
             </div>
-            
+
             <div className="space-y-4">
               <Button
                 onClick={() => {
@@ -263,7 +296,7 @@ export default function TournamentApp() {
                 <Users className="w-5 h-5 mr-3" />
                 Register Team
               </Button>
-              
+
               <Button
                 onClick={() => window.open("/standings", "_blank")}
                 variant="outline"
@@ -272,7 +305,7 @@ export default function TournamentApp() {
                 <BarChart3 className="w-5 h-5 mr-3" />
                 Standings
               </Button>
-              
+
               <Button
                 onClick={() => window.open("/rules", "_blank")}
                 variant="outline"
@@ -281,7 +314,7 @@ export default function TournamentApp() {
                 <Flag className="w-5 h-5 mr-3" />
                 Rules
               </Button>
-              
+
               {isAdmin ? (
                 <div className="space-y-3">
                   <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg border border-green-200">
@@ -291,7 +324,7 @@ export default function TournamentApp() {
                       <p className="text-sm text-green-700">{currentAdminName}</p>
                     </div>
                   </div>
-                  
+
                   <Button
                     onClick={handleAdminLogout}
                     variant="outline"
@@ -299,6 +332,15 @@ export default function TournamentApp() {
                   >
                     <LogOut className="w-5 h-5 mr-3" />
                     Logout Admin
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    onClick={handleResetTournament}
+                    className="w-full justify-start h-14 outdoor-text border-red-300 text-red-700 hover:bg-red-50"
+                  >
+                    <Settings className="w-5 h-5 mr-3" />
+                    Reset Tournament
                   </Button>
                 </div>
               ) : (
@@ -314,24 +356,30 @@ export default function TournamentApp() {
                   Admin Login
                 </Button>
               )}
-              
-              <Button
-                variant="outline"
-                onClick={resetTournament}
-                className="w-full justify-start h-14 outdoor-text border-red-300 text-red-700 hover:bg-red-50"
-              >
-                <Settings className="w-5 h-5 mr-3" />
-                Reset Tournament
-              </Button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Live Banner */}
       <LiveBanner />
 
-      {/* Tournament Stats Dashboard */}
+      {!isAdmin && currentPhase !== "registration" && (
+        <div className="px-4 pt-3">
+          <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900 flex items-start gap-2">
+            <Eye className="w-4 h-4 mt-0.5 shrink-0" />
+            <p>
+              You&apos;re in spectator mode. Scores and bracket updates appear automatically
+              {realtimeConnected
+                ? " in realtime"
+                : isPolling
+                  ? " every ~30 seconds"
+                  : ""}
+              . Admins enter scores from a logged-in device.
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="px-4 py-6 pb-24 space-y-6">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <Card className="tournament-card">
@@ -352,8 +400,8 @@ export default function TournamentApp() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                                  <p className="outdoor-text text-slate-600 font-medium">Cash</p>
-                <p className="text-4xl font-black text-slate-900">${totalCash}</p>
+                  <p className="outdoor-text text-slate-600 font-medium">Cash</p>
+                  <p className="text-4xl font-black text-slate-900">${totalCash}</p>
                 </div>
                 <div className="p-3 bg-green-100 rounded-2xl">
                   <DollarSign className="w-8 h-8 text-green-600" />
@@ -368,7 +416,8 @@ export default function TournamentApp() {
                 <div>
                   <p className="outdoor-text text-slate-600 font-medium">Paid</p>
                   <p className="text-4xl font-black text-slate-900">
-                    {paidTeams}<span className="text-xl text-slate-500">/{teams.length}</span>
+                    {paidTeams}
+                    <span className="text-xl text-slate-500">/{teams.length}</span>
                   </p>
                 </div>
                 <div className="p-3 bg-orange-100 rounded-2xl">
@@ -384,78 +433,80 @@ export default function TournamentApp() {
                 <div>
                   <p className="outdoor-text text-slate-600 font-medium">Phase</p>
                   <Badge className="usa-button-gradient text-white border-0 mt-2 px-3 py-1">
-                    {currentPhase.replace("-", " ").toUpperCase()}
+                    {viewPhase.replace("-", " ").toUpperCase()}
+                    {viewPhase !== currentPhase && (
+                      <span className="ml-1 opacity-80">(live: {currentPhase.replace("-", " ")})</span>
+                    )}
                   </Badge>
                 </div>
-                <div className="p-3 bg-purple-100 rounded-2xl">
-                  {getPhaseIcon()}
-                </div>
+                <div className="p-3 bg-purple-100 rounded-2xl">{getPhaseIcon()}</div>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Current Phase Display */}
         <Card className="tournament-card">
           <CardHeader className="border-b border-slate-200">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="p-2 usa-button-gradient rounded-xl text-white">
-                  {getPhaseIcon()}
-                </div>
+                <div className="p-2 usa-button-gradient rounded-xl text-white">{getPhaseIcon()}</div>
                 <div>
                   <CardTitle className="text-2xl font-black text-slate-900">
                     {getPhaseTitle()}
                   </CardTitle>
                   <CardDescription className="outdoor-text text-slate-600">
-                    {currentPhase === "registration" && "Add teams and manage registrations"}
-                    {currentPhase === "pool-play" && "All teams play each other in round-robin"}
-                    {currentPhase === "knockout" && "Single elimination tournament bracket"}
+                    {viewPhase === "registration" && "Add teams and manage registrations"}
+                    {viewPhase === "pool-play" && "All teams play each other in round-robin"}
+                    {viewPhase === "knockout" && "Single elimination tournament bracket"}
                   </CardDescription>
                 </div>
               </div>
-
             </div>
           </CardHeader>
-          <CardContent className="p-6">
-            {renderPhaseContent()}
-          </CardContent>
+          <CardContent className="p-6">{renderPhaseContent()}</CardContent>
         </Card>
       </div>
 
-      {/* Redesigned Bottom Navigation - Patriotic Theme */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 safe-area-bottom">
-        {/* Patriotic gradient background matching header */}
         <div className="usa-header-gradient border-t-2 border-white/20">
           <div className="flex px-2 py-3">
             {navigationItems.map((item) => {
               const Icon = item.icon
-              const isActive = currentPhase === item.id
-              
+              const isActive = viewPhase === item.id
+              const disabled = item.disabled
+
               return (
                 <button
                   key={item.id}
-                  onClick={() => !item.disabled && updateTournamentPhase(item.id as any)}
-                  disabled={item.disabled}
+                  onClick={() => !disabled && handlePhaseNav(item.id)}
+                  disabled={disabled}
+                  title={
+                    !isAdmin
+                      ? "Browse this phase (view only)"
+                      : item.disabled
+                        ? "Not available yet"
+                        : "Set live tournament phase"
+                  }
                   className={`
                     flex-1 flex flex-col items-center justify-center
                     touch-target relative transition-all duration-200
-                    ${isActive 
-                      ? 'text-white transform scale-110' 
-                      : 'text-white/80 hover:text-white'
+                    ${
+                      isActive
+                        ? "text-white transform scale-110"
+                        : "text-white/80 hover:text-white"
                     }
-                    ${item.disabled ? 'opacity-40 cursor-not-allowed' : 'hover:bg-white/10 rounded-xl'}
+                    ${disabled ? "opacity-40 cursor-not-allowed" : "hover:bg-white/10 rounded-xl"}
                   `}
                 >
                   <div className="relative">
-                    <Icon className={`w-6 h-6 mb-1 ${isActive ? 'animate-pulse' : ''}`} />
+                    <Icon className={`w-6 h-6 mb-1 ${isActive ? "animate-pulse" : ""}`} />
                     {item.badge && (
                       <span className="absolute -top-1 -right-1 bg-yellow-400 text-slate-900 text-xs rounded-full w-5 h-5 flex items-center justify-center font-black border-2 border-white shadow-lg">
                         {item.badge}
                       </span>
                     )}
                   </div>
-                  <span className={`text-xs font-bold ${isActive ? 'text-yellow-300' : ''}`}>
+                  <span className={`text-xs font-bold ${isActive ? "text-yellow-300" : ""}`}>
                     {item.label}
                   </span>
                   {isActive && (
@@ -464,8 +515,7 @@ export default function TournamentApp() {
                 </button>
               )
             })}
-            
-            {/* Special Menu Item - Matching Design */}
+
             <button
               onClick={() => setShowMobileMenu(true)}
               className="flex-1 flex flex-col items-center justify-center touch-target text-white/80 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200"
@@ -479,4 +529,3 @@ export default function TournamentApp() {
     </div>
   )
 }
-

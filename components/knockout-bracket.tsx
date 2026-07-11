@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -9,440 +9,134 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Trophy, Crown } from "lucide-react"
 import type { Match, Team } from "@/types/tournament"
 import { useAdmin } from "@/hooks/use-admin"
+import {
+  findChampion,
+  getBracketSize,
+  getMatchWinner,
+  getRoundName,
+  getSeedMap,
+  getSeedNumber,
+  getTargetScore,
+  organizeRounds,
+  planNextRound,
+  seedTeamsFromPool,
+  getByeTeams,
+} from "@/lib/knockout"
 
 interface KnockoutBracketProps {
   matches: Match[]
   poolPlayMatches: Match[]
   updateMatch: (matchId: number, updates: Partial<Match>) => Promise<void>
-  createMatches: (matches: Array<Omit<Match, "id" | "tournamentId" | "tournament"> & { tournamentId?: number }>) => Promise<void>
+  createMatches: (
+    matches: Array<
+      Omit<Match, "id" | "tournamentId" | "tournament"> & { tournamentId?: number }
+    >,
+  ) => Promise<void>
   byeTeam: Team | null
-  allTeams: Team[]  // Add all teams for better bye display
+  allTeams: Team[]
 }
 
-export default function KnockoutBracket({ matches, poolPlayMatches, updateMatch, createMatches, byeTeam, allTeams }: KnockoutBracketProps) {
-  const { isAdmin } = useAdmin()
+export default function KnockoutBracket({
+  matches,
+  poolPlayMatches,
+  updateMatch,
+  createMatches,
+  allTeams,
+}: KnockoutBracketProps) {
+  const { isAdmin, requireAdmin } = useAdmin()
   const [editingMatch, setEditingMatch] = useState<Match | null>(null)
   const [team1Score, setTeam1Score] = useState("")
   const [team2Score, setTeam2Score] = useState("")
   const [champion, setChampion] = useState<Team | null>(null)
-  const [creatingRounds, setCreatingRounds] = useState<Set<number>>(new Set()) // Track rounds being created
+  const creatingRoundsRef = useRef<Set<number>>(new Set())
 
-  // Calculate all bye teams based on bracket size and participating teams
-  const calculateByeTeams = (): Team[] => {
-    if (!allTeams || allTeams.length === 0 || !poolPlayMatches) return []
-    
-    try {
-      // Calculate bracket size and byes needed
-      const bracketSize = allTeams.length > 1 ? Math.pow(2, Math.ceil(Math.log2(allTeams.length))) : 2
-      const byesNeeded = bracketSize - allTeams.length
-      
-      if (byesNeeded <= 0) return []
-      
-      // Use the same pool play calculation as getSeedNumber for consistency
-      const teamStats = allTeams.map((t) => {
-        const teamPoolPlayMatches = poolPlayMatches.filter((match) => 
-          match.phase === "pool-play" && 
-          match.completed &&
-          (match.team1.id === t.id || match.team2.id === t.id)
-        )
-        
-        let wins = 0
-        let pointsFor = 0
-        let pointsAgainst = 0
-        
-        teamPoolPlayMatches.forEach((match) => {
-          if (match.team1.id === t.id) {
-            pointsFor += match.team1Score
-            pointsAgainst += match.team2Score
-            if (match.team1Score > match.team2Score) wins++
-          } else {
-            pointsFor += match.team2Score
-            pointsAgainst += match.team1Score
-            if (match.team2Score > match.team1Score) wins++
-          }
-        })
-        
-        return {
-          team: t,
-          wins,
-          pointsFor,
-          pointsAgainst,
-          pointDifferential: pointsFor - pointsAgainst
-        }
-      })
-      
-      // Sort teams by pool play performance (wins, then point differential)
-      teamStats.sort((a, b) => {
-        if (b.wins !== a.wins) return b.wins - a.wins
-        return b.pointDifferential - a.pointDifferential
-      })
-      
-      // Return top seeds as bye teams
-      return teamStats.slice(0, byesNeeded).map(ts => ts.team)
-    } catch (error) {
-      console.error("Error calculating bye teams:", error)
-      return []
-    }
-  }
-
-  const byeTeams = calculateByeTeams()
-  const bracketSize = allTeams && allTeams.length > 0 ? Math.pow(2, Math.ceil(Math.log2(allTeams.length))) : 2
-
-  // Get seed number for a team based on their pool play stats (not current knockout stats)
-  const getSeedNumber = (team: Team): number => {
-    if (!allTeams || allTeams.length === 0 || !poolPlayMatches) return 1
-    
-    try {
-      // Use the allTeams array which should already be sorted by pool play standings
-      // Calculate pool play stats for all teams to get consistent seeding
-      const teamStats = allTeams.map((t) => {
-        const teamPoolPlayMatches = poolPlayMatches.filter((match) => 
-          match.phase === "pool-play" && 
-          match.completed &&
-          (match.team1.id === t.id || match.team2.id === t.id)
-        )
-        
-        let wins = 0
-        let pointsFor = 0
-        let pointsAgainst = 0
-        
-        teamPoolPlayMatches.forEach((match) => {
-          if (match.team1.id === t.id) {
-            pointsFor += match.team1Score
-            pointsAgainst += match.team2Score
-            if (match.team1Score > match.team2Score) wins++
-          } else {
-            pointsFor += match.team2Score
-            pointsAgainst += match.team1Score
-            if (match.team2Score > match.team1Score) wins++
-          }
-        })
-        
-        return {
-          team: t,
-          wins,
-          pointsFor,
-          pointsAgainst,
-          pointDifferential: pointsFor - pointsAgainst
-        }
-      })
-      
-      // Sort all teams by pool play performance (wins, then point differential)
-      teamStats.sort((a, b) => {
-        if (b.wins !== a.wins) return b.wins - a.wins
-        return b.pointDifferential - a.pointDifferential
-      })
-      
-      // Find the team's position in the sorted list
-      const seedPosition = teamStats.findIndex((ts) => ts.team.id === team.id)
-      return seedPosition >= 0 ? seedPosition + 1 : 1
-    } catch (error) {
-      console.error("Error calculating seed number:", error)
-      return 1
-    }
-  }
-
-  // Organize matches by round for bracket display
-  const rounds = matches.reduce(
-    (acc, match) => {
-      const round = match.round || 1
-      if (!acc[round]) acc[round] = []
-      acc[round].push(match)
-      return acc
-    },
-    {} as Record<number, Match[]>,
+  const seededTeams = useMemo(
+    () => seedTeamsFromPool(allTeams || [], poolPlayMatches || []),
+    [allTeams, poolPlayMatches],
   )
-  
-  // Sort matches within each round to maintain stable bracket structure
-  Object.keys(rounds).forEach(roundKey => {
-    const roundNum = Number(roundKey)
-    rounds[roundNum].sort((a, b) => {
-      // Sort by match ID to maintain creation order (preserves bracket structure)
-      return a.id - b.id
-    })
-  })
-  const totalRounds = Math.max(...Object.keys(rounds).map(Number), 1)
-  const roundNumbers = Object.keys(rounds)
-    .map(Number)
-    .sort((a, b) => a - b)
+  const seedMap = useMemo(() => getSeedMap(seededTeams), [seededTeams])
+  const byeTeams = useMemo(() => getByeTeams(seededTeams), [seededTeams])
+  const bracketSize = getBracketSize(allTeams?.length || 0)
 
-  // Get winner of a match
-  const getMatchWinner = (match: Match): Team | null => {
-    if (!match.completed) return null
-    return match.team1Score > match.team2Score ? match.team1 : match.team2
-  }
+  const { rounds, roundNumbers, totalRounds } = useMemo(
+    () => organizeRounds(matches.filter((m) => m.phase === "knockout")),
+    [matches],
+  )
 
-  // Get round name
-  const getRoundName = (round: number) => {
-    // Use bracket size to determine round names
-    const expectedRounds = Math.ceil(Math.log2(bracketSize))
-    if (round === expectedRounds) return "Championship"
-    if (round === expectedRounds - 1) return "Semifinals"
-    if (round === expectedRounds - 2) return "Quarterfinals"
-    if (round === 1) return "First Round"
-    return `Round ${round}`
-  }
+  const seedOf = (team: Team) => getSeedNumber(team, seedMap)
 
-  // Get target score for a round
-  const getTargetScore = (round: number) => {
-    // Use bracket size to determine target scores
-    const expectedRounds = Math.ceil(Math.log2(bracketSize))
-    if (round >= expectedRounds - 1) {
-      return 21 // Semifinals and Finals
-    }
-    return 15 // All earlier rounds
-  }
+  const sanitizeScoreInput = (raw: string) => raw.replace(/[^\d]/g, "").slice(0, 3)
 
-  // Advancement logic
+  // Advancement — admin only; pure planner decides what to create
   useEffect(() => {
     const advanceWinners = async () => {
+      if (!isAdmin) return
       if (!matches || matches.length === 0) return
-      
-      // Get knockout matches only
+
       const knockoutMatches = matches.filter((match) => match.phase === "knockout")
       if (knockoutMatches.length === 0) return
-      
-      // Get all rounds
-      const rounds = Array.from(new Set(knockoutMatches.map((match) => match.round).filter((round): round is number => round !== undefined)))
-      if (rounds.length === 0) return
-      
-      // Check each round for completion
-      for (const currentRound of rounds) {
-        const currentRoundMatches = knockoutMatches.filter((match) => match.round === currentRound)
+
+      const roundNums = Array.from(
+        new Set(
+          knockoutMatches
+            .map((match) => match.round)
+            .filter((round): round is number => round !== undefined),
+        ),
+      ).sort((a, b) => a - b)
+
+      for (const currentRound of roundNums) {
+        const currentRoundMatches = knockoutMatches.filter(
+          (match) => match.round === currentRound,
+        )
         if (currentRoundMatches.length === 0) continue
-        
-        const completedCurrentRound = currentRoundMatches.every((m) => m.completed)
-        if (completedCurrentRound && currentRoundMatches.length > 1) {
-          // Check if next round already exists (more thorough check)
-          const nextRoundMatches = matches.filter((m) => m.phase === "knockout" && m.round === currentRound + 1)
-          const expectedNextRoundMatches = Math.floor((currentRoundMatches.length + byeTeams.length) / 2)
-          
-          console.log(`🔍 Round ${currentRound} completed: ${currentRoundMatches.length} matches`)
-          console.log(`  📊 Next round matches exist: ${nextRoundMatches.length}, expected: ${expectedNextRoundMatches}`)
-          console.log(`  🔒 Round ${currentRound + 1} creation in progress: ${creatingRounds.has(currentRound + 1)}`)
-          
-          if (nextRoundMatches.length === 0 && !creatingRounds.has(currentRound + 1)) {
-            // Get winners from current round
-            const winners: Team[] = []
-            currentRoundMatches.forEach((match) => {
-              const winner = match.team1Score > match.team2Score ? match.team1 : match.team2
-              winners.push(winner)
-            })
-            
-            // For the first round, add all bye teams
-            if (currentRound === 1 && byeTeams.length > 0) {
-              // Add all bye teams at the beginning to preserve seeding
-              winners.unshift(...byeTeams)
-            }
-            
-            if (winners.length < 2) return
-            
-            // Sort by seed number to maintain proper bracket seeding
-            winners.sort((a, b) => getSeedNumber(a) - getSeedNumber(b))
-            
-            // Create next round matches
-            const nextRoundMatchesToCreate: Array<Omit<Match, "id" | "tournamentId" | "tournament"> & { tournamentId?: number }> = []
-            for (let i = 0; i < winners.length / 2; i++) {
-              const team1 = winners[i]
-              const team2 = winners[winners.length - 1 - i]
-              
-              // Validate teams before creating match
-              if (!team1 || !team2) {
-                console.error(`❌ Invalid teams for match ${i}:`, { team1, team2 })
-                continue
-              }
-              
-              // VALIDATION: Ensure teams are different
-              if (team1.id === team2.id) {
-                console.error(`❌ BUG DETECTED: Team ${team1.name} scheduled to play itself in round ${currentRound + 1}!`)
-                continue
-              }
-              
-              // ENHANCED DUPLICATE CHECK: Check if this specific matchup already exists
-              const duplicateMatch = matches.find(m => 
-                m.phase === "knockout" && 
-                m.round === currentRound + 1 &&
-                ((m.team1.id === team1.id && m.team2.id === team2.id) ||
-                 (m.team1.id === team2.id && m.team2.id === team1.id))
-              )
-              
-              if (duplicateMatch) {
-                console.warn(`⚠️ DUPLICATE PREVENTED: Match ${team1.name} vs ${team2.name} already exists in round ${currentRound + 1}`)
-                continue
-              }
-              
-              console.log(`  🆕 Creating: #${getSeedNumber(team1)} ${team1.name} vs #${getSeedNumber(team2)} ${team2.name}`)
-              
-              nextRoundMatchesToCreate.push({
-                team1,
-                team2,
-                team1Score: 0,
-                team2Score: 0,
-                completed: false,
-                phase: "knockout",
-                round: currentRound + 1,
-              })
-            }
-            
-            if (nextRoundMatchesToCreate.length > 0) {
-              console.log(`🏆 Creating ${nextRoundMatchesToCreate.length} new matches for round ${currentRound + 1}`)
-              
-              // Lock this round to prevent duplicates
-              setCreatingRounds(prev => new Set([...prev, currentRound + 1]))
-              
-              try {
-                await createMatches(nextRoundMatchesToCreate)
-                console.log(`✅ Round ${currentRound + 1} matches created successfully`)
-              } catch (error) {
-                console.error(`❌ Failed to create round ${currentRound + 1} matches:`, error)
-              } finally {
-                // Always unlock the round, whether success or failure
-                setCreatingRounds(prev => {
-                  const newSet = new Set(prev)
-                  newSet.delete(currentRound + 1)
-                  return newSet
-                })
-              }
-            } else {
-              console.log(`ℹ️ No new matches to create - all matches already exist`)
-            }
-          }
-        } else if (completedCurrentRound && currentRoundMatches.length === 1) {
-          // Check if this is truly the final match or just a single match in an early round
-          const nextRoundMatches = matches.filter((m) => m.phase === "knockout" && m.round === currentRound + 1)
-          const isLastPossibleRound = currentRound === Math.ceil(Math.log2(bracketSize))
-          
-          console.log(`🔍 Single match completed in round ${currentRound}:`)
-          console.log(`  📊 Bracket size: ${bracketSize}, expected final round: ${Math.ceil(Math.log2(bracketSize))}`)
-          console.log(`  🏆 Is last possible round: ${isLastPossibleRound}`)
-          console.log(`  📋 Next round matches exist: ${nextRoundMatches.length}`)
-          
-          if (isLastPossibleRound && nextRoundMatches.length === 0) {
-            // Tournament complete - set champion
-            const finalMatch = currentRoundMatches[0]
-            const winner = finalMatch.team1Score > finalMatch.team2Score ? finalMatch.team1 : finalMatch.team2
-            console.log(`🏆 Tournament complete! Champion: ${winner.name}`)
-            setChampion(winner)
-          } else if (nextRoundMatches.length === 0) {
-            // This is just a single match in an early round - advance normally
-            console.log(`🚀 Advancing from single match in round ${currentRound}`)
-            
-            // Get winner from the single match
-            const winner = currentRoundMatches[0].team1Score > currentRoundMatches[0].team2Score ? 
-              currentRoundMatches[0].team1 : currentRoundMatches[0].team2
-            console.log(`  🥇 Winner: ${winner.name}`)
-            
-            const winners = [winner]
-            
-            // For the first round, add all bye teams
-            if (currentRound === 1 && byeTeams.length > 0) {
-              console.log(`  👋 Adding ${byeTeams.length} bye teams to advancement`)
-              byeTeams.forEach(team => {
-                console.log(`    #${getSeedNumber(team)} ${team.name} - BYE`)
-              })
-              winners.unshift(...byeTeams)
-            }
-            
-            console.log(`  👥 Total advancing teams: ${winners.length}`)
-            console.log(`  📊 Next round matches exist: ${nextRoundMatches.length}`)
-            console.log(`  🔒 Round ${currentRound + 1} creation in progress: ${creatingRounds.has(currentRound + 1)}`)
-            
-            if (winners.length >= 2 && !creatingRounds.has(currentRound + 1)) {
-              // Sort by seed number to maintain proper bracket seeding
-              winners.sort((a, b) => getSeedNumber(a) - getSeedNumber(b))
-              
-              console.log(`  🎯 Creating next round matches:`)
-              
-              // Create next round matches
-              const nextRoundMatchesToCreate: Omit<Match, "id">[] = []
-              for (let i = 0; i < winners.length / 2; i++) {
-                const team1 = winners[i]
-                const team2 = winners[winners.length - 1 - i]
-                
-                // Validate teams before creating match
-                if (!team1 || !team2) {
-                  console.error(`❌ Invalid teams for match ${i}:`, { team1, team2 })
-                  continue
-                }
-                
-                // VALIDATION: Ensure teams are different
-                if (team1.id === team2.id) {
-                  console.error(`❌ BUG DETECTED: Team ${team1.name} scheduled to play itself in round ${currentRound + 1}!`)
-                  continue
-                }
-                
-                // ENHANCED DUPLICATE CHECK: Check if this specific matchup already exists
-                const duplicateMatch = matches.find(m => 
-                  m.phase === "knockout" && 
-                  m.round === currentRound + 1 &&
-                  ((m.team1.id === team1.id && m.team2.id === team2.id) ||
-                   (m.team1.id === team2.id && m.team2.id === team1.id))
-                )
-                
-                if (duplicateMatch) {
-                  console.warn(`⚠️ DUPLICATE PREVENTED: Match ${team1.name} vs ${team2.name} already exists in round ${currentRound + 1}`)
-                  continue
-                }
-                
-                const team1Seed = getSeedNumber(team1)
-                const team2Seed = getSeedNumber(team2)
-                console.log(`    🥊 Match ${i + 1}: #${team1Seed} ${team1.name} vs #${team2Seed} ${team2.name}`)
-                
-                nextRoundMatchesToCreate.push({
-                  team1,
-                  team2,
-                  team1Score: 0,
-                  team2Score: 0,
-                  completed: false,
-                  phase: "knockout",
-                  round: currentRound + 1,
-                })
-              }
-              
-              if (nextRoundMatchesToCreate.length > 0) {
-                console.log(`🏆 Creating ${nextRoundMatchesToCreate.length} new matches for round ${currentRound + 1}`)
-                
-                // Lock this round to prevent duplicates
-                setCreatingRounds(prev => new Set([...prev, currentRound + 1]))
-                
-                try {
-                  await createMatches(nextRoundMatchesToCreate)
-                  console.log(`✅ Round ${currentRound + 1} matches created successfully`)
-                } catch (error) {
-                  console.error(`❌ Failed to create round ${currentRound + 1} matches:`, error)
-                } finally {
-                  // Always unlock the round, whether success or failure
-                  setCreatingRounds(prev => {
-                    const newSet = new Set(prev)
-                    newSet.delete(currentRound + 1)
-                    return newSet
-                  })
-                }
-              } else {
-                console.log(`ℹ️ No new matches to create - all matches already exist`)
-              }
-            }
-          }
+
+        const plan = planNextRound({
+          currentRound,
+          currentRoundMatches,
+          existingKnockoutMatches: knockoutMatches,
+          byeTeams,
+          seedMap,
+          bracketSize,
+        })
+
+        if (plan.kind === "champion") {
+          setChampion(plan.champion)
+          continue
+        }
+
+        if (plan.kind !== "matches") continue
+        if (creatingRoundsRef.current.has(plan.round)) continue
+
+        creatingRoundsRef.current.add(plan.round)
+        try {
+          await createMatches(plan.matches)
+        } catch (error) {
+          console.error(`Failed to create round ${plan.round} matches:`, error)
+        } finally {
+          creatingRoundsRef.current.delete(plan.round)
         }
       }
-    }
-    
-    advanceWinners()
-  }, [matches, byeTeams])
 
-  // Score update handler (Supabase version)
+      // Also derive champion from existing finals if planner is noop
+      const existingChampion = findChampion(knockoutMatches, bracketSize)
+      if (existingChampion) setChampion(existingChampion)
+    }
+
+    void advanceWinners()
+  }, [matches, byeTeams, isAdmin, seedMap, bracketSize, createMatches])
+
   const updateMatchScore = async (completeGame: boolean = false) => {
+    if (!requireAdmin("edit knockout scores")) return
     if (!editingMatch || team1Score === "" || team2Score === "") return
-    const score1 = Number.parseInt(team1Score)
-    const score2 = Number.parseInt(team2Score)
-    if (isNaN(score1) || isNaN(score2) || score1 < 0 || score2 < 0) return
-    
-    // If completing the game, ensure scores aren't tied
+    const score1 = Number.parseInt(team1Score, 10)
+    const score2 = Number.parseInt(team2Score, 10)
+    if (Number.isNaN(score1) || Number.isNaN(score2) || score1 < 0 || score2 < 0) return
+
     if (completeGame && score1 === score2) {
       alert("Knockout games cannot end in a tie! Please adjust the scores.")
       return
     }
-    
+
     await updateMatch(editingMatch.id, {
       team1Score: score1,
       team2Score: score2,
@@ -454,13 +148,14 @@ export default function KnockoutBracket({ matches, poolPlayMatches, updateMatch,
   }
 
   const editMatch = (match: Match) => {
+    if (!requireAdmin("edit knockout scores")) return
     setEditingMatch(match)
     setTeam1Score(match.completed ? match.team1Score.toString() : "")
     setTeam2Score(match.completed ? match.team2Score.toString() : "")
   }
 
   const ByeCard = ({ team }: { team: Team }) => {
-    const seedNumber = getSeedNumber(team)
+    const seedNumber = seedOf(team)
 
     return (
       <div className="border-4 border-blue-400 rounded-lg p-4 min-w-[300px] bg-gradient-to-br from-blue-50 via-white to-blue-100 shadow-lg">
@@ -494,9 +189,9 @@ export default function KnockoutBracket({ matches, poolPlayMatches, updateMatch,
   }: { match: Match; roundIndex: number; matchIndex: number }) => {
     const isEditing = editingMatch?.id === match.id
     const winner = getMatchWinner(match)
-    const team1Seed = getSeedNumber(match.team1)
-    const team2Seed = getSeedNumber(match.team2)
-    const targetScore = getTargetScore(match.round || 1)
+    const team1Seed = seedOf(match.team1)
+    const team2Seed = seedOf(match.team2)
+    const targetScore = getTargetScore(match.round || 1, bracketSize)
 
     return (
       <div className="relative">
@@ -551,19 +246,24 @@ export default function KnockoutBracket({ matches, poolPlayMatches, updateMatch,
 
                     <div className="flex flex-col items-center gap-2">
                       <Input
-                        type="number"
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        enterKeyHint="done"
+                        autoComplete="off"
                         value={team1Score}
-                        onChange={(e) => setTeam1Score(e.target.value)}
+                        onChange={(e) => setTeam1Score(sanitizeScoreInput(e.target.value))}
+                        onFocus={(e) => e.target.select()}
                         placeholder="0"
-                        className="w-20 h-16 text-center text-3xl font-bold border-2 border-red-300 rounded-lg"
-                        min="0"
+                        className="w-24 min-h-[3.5rem] text-center text-3xl font-bold border-2 border-red-300 rounded-lg touch-target"
+                        aria-label={`${match.team1.name} score`}
                       />
                       <Button
                         onClick={() => {
                           setTeam1Score(targetScore.toString())
                           setTeam2Score("0")
                         }}
-                        className="bg-red-600 hover:bg-red-700 text-white font-bold px-4 py-2 text-sm rounded-full"
+                        className="bg-red-600 hover:bg-red-700 text-white font-bold px-4 py-2 text-sm rounded-full min-h-11"
                         size="sm"
                       >
                         🏆 Win
@@ -621,19 +321,24 @@ export default function KnockoutBracket({ matches, poolPlayMatches, updateMatch,
 
                     <div className="flex flex-col items-center gap-2">
                       <Input
-                        type="number"
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        enterKeyHint="done"
+                        autoComplete="off"
                         value={team2Score}
-                        onChange={(e) => setTeam2Score(e.target.value)}
+                        onChange={(e) => setTeam2Score(sanitizeScoreInput(e.target.value))}
+                        onFocus={(e) => e.target.select()}
                         placeholder="0"
-                        className="w-20 h-16 text-center text-3xl font-bold border-2 border-blue-300 rounded-lg"
-                        min="0"
+                        className="w-24 min-h-[3.5rem] text-center text-3xl font-bold border-2 border-blue-300 rounded-lg touch-target"
+                        aria-label={`${match.team2.name} score`}
                       />
                       <Button
                         onClick={() => {
                           setTeam2Score(targetScore.toString())
                           setTeam1Score("0")
                         }}
-                        className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2 text-sm rounded-full"
+                        className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2 text-sm rounded-full min-h-11"
                         size="sm"
                       >
                         🏆 Win
@@ -850,7 +555,7 @@ export default function KnockoutBracket({ matches, poolPlayMatches, updateMatch,
               <div>
                 <h3 className="text-2xl font-bold text-red-800">🏆 TOURNAMENT CHAMPION 🏆</h3>
                 <p className="text-3xl font-bold bg-gradient-to-r from-red-600 to-blue-600 bg-clip-text text-transparent mt-2">
-                  #{getSeedNumber(champion)} {champion.name}
+                  #{seedOf(champion)} {champion.name}
                 </p>
                 <p className="text-blue-700 font-semibold">{champion.players?.join(" & ")}</p>
                 <p className="text-lg text-green-700 font-bold mt-2">🇺🇸 All-American Champions! 🇺🇸</p>
@@ -895,7 +600,7 @@ export default function KnockoutBracket({ matches, poolPlayMatches, updateMatch,
                 {/* Round Header */}
                 <div className="text-center mb-4">
                   <h3 className="text-lg font-bold text-blue-900 bg-gradient-to-r from-red-100 to-blue-100 px-4 py-2 rounded-lg border-2 border-blue-300">
-                    {getRoundName(roundNum)}
+                    {getRoundName(roundNum, bracketSize)}
                   </h3>
                   <p className="text-sm text-gray-600 mt-1">
                     {rounds[roundNum].length} {rounds[roundNum].length === 1 ? "match" : "matches"}

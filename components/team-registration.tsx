@@ -10,10 +10,18 @@ import { Badge } from "@/components/ui/badge"
 import { Trash2, Edit2, Users, Wifi, Plus, Crown, Shield } from "lucide-react"
 import type { Team } from "@/types/tournament"
 import { useAdmin } from "@/hooks/use-admin"
+import {
+  MAX_TEAMS,
+  MIN_TEAMS_TO_START,
+  findDuplicateTeamName,
+  formatSupabaseError,
+  normalizeName,
+  validateTeamInput,
+} from "@/lib/registration"
 
 interface TeamRegistrationProps {
   teams: Team[]
-  addTeam: (team: Omit<Team, "id">) => Promise<void>
+  addTeam: (team: Omit<Team, "id" | "tournamentId"> & { tournamentId?: number }) => Promise<void>
   updateTeam: (teamId: number, updates: Partial<Team>) => Promise<void>
   deleteTeam: (teamId: number) => Promise<void>
   onStartTournament: () => Promise<void>
@@ -26,32 +34,43 @@ export default function TeamRegistration({
   deleteTeam,
   onStartTournament,
 }: TeamRegistrationProps) {
-  const { isAdmin } = useAdmin()
+  const { isAdmin, requireAdmin } = useAdmin()
   const [teamName, setTeamName] = useState("")
   const [player1, setPlayer1] = useState("")
   const [player2, setPlayer2] = useState("")
   const [editingTeam, setEditingTeam] = useState<Team | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [updatingPaidId, setUpdatingPaidId] = useState<number | null>(null)
 
   const handleAddTeam = async () => {
-    console.log("🎯 ADD TEAM DEBUG:", {
-      teamName: teamName.trim(),
-      player1: player1.trim(),
-      player2: player2.trim(),
-      isSubmitting
-    })
-    
-    if (!teamName.trim() || !player1.trim() || !player2.trim() || isSubmitting) {
-      console.log("❌ VALIDATION FAILED - missing fields or already submitting")
+    if (!requireAdmin("add teams")) return
+    if (isSubmitting) return
+
+    const validationError = validateTeamInput({ teamName, player1, player2 })
+    if (validationError) {
+      alert(validationError)
       return
     }
 
-    console.log("✅ VALIDATION PASSED - attempting to add team")
+    if (teams.length >= MAX_TEAMS) {
+      alert(`Tournament is full (${MAX_TEAMS} teams max).`)
+      return
+    }
+
+    const duplicate = findDuplicateTeamName(
+      teamName,
+      teams.map((t) => t.name),
+    )
+    if (duplicate) {
+      alert(duplicate)
+      return
+    }
+
     setIsSubmitting(true)
     try {
-      const newTeam: Omit<Team, "id"> = {
-        name: teamName.trim(),
-        players: [player1.trim(), player2.trim()],
+      const newTeam: Omit<Team, "id" | "tournamentId"> & { tournamentId?: number } = {
+        name: normalizeName(teamName),
+        players: [normalizeName(player1), normalizeName(player2)],
         paid: false,
         wins: 0,
         losses: 0,
@@ -59,69 +78,85 @@ export default function TeamRegistration({
         pointsAgainst: 0,
       }
 
-      console.log("🚀 CALLING addTeam with:", newTeam)
       await addTeam(newTeam)
-      console.log("✅ ADD TEAM SUCCESS!")
       resetForm()
     } catch (error) {
-      console.error("❌ ADD TEAM ERROR:", error)
-      alert("Failed to add team. Please try again.")
+      console.error("ADD TEAM ERROR:", error)
+      alert(formatSupabaseError(error, "Failed to add team. Please try again."))
     } finally {
       setIsSubmitting(false)
     }
   }
 
   const handleUpdateTeam = async () => {
-    if (!editingTeam || !teamName.trim() || !player1.trim() || !player2.trim() || isSubmitting) return
+    if (!requireAdmin("update teams")) return
+    if (!editingTeam || isSubmitting) return
+
+    const validationError = validateTeamInput({ teamName, player1, player2 })
+    if (validationError) {
+      alert(validationError)
+      return
+    }
+
+    const duplicate = findDuplicateTeamName(
+      teamName,
+      teams.filter((t) => t.id !== editingTeam.id).map((t) => t.name),
+    )
+    if (duplicate) {
+      alert(duplicate)
+      return
+    }
 
     setIsSubmitting(true)
     try {
       await updateTeam(editingTeam.id, {
-        name: teamName.trim(),
-        players: [player1.trim(), player2.trim()],
+        name: normalizeName(teamName),
+        players: [normalizeName(player1), normalizeName(player2)],
       })
       resetForm()
     } catch (error) {
       console.error("Error updating team:", error)
-      alert("Failed to update team. Please try again.")
+      alert(formatSupabaseError(error, "Failed to update team. Please try again."))
     } finally {
       setIsSubmitting(false)
     }
   }
 
   const handleDeleteTeam = async (teamId: number) => {
-    console.log("🎯 DELETE TEAM DEBUG:", { teamId })
-    
+    if (!requireAdmin("delete teams")) return
     if (!confirm("Are you sure you want to delete this team?")) {
-      console.log("❌ DELETE CANCELLED by user")
       return
     }
 
-    console.log("✅ DELETE CONFIRMED - attempting to delete team")
     try {
-      console.log("🚀 CALLING deleteTeam with ID:", teamId)
       await deleteTeam(teamId)
-      console.log("✅ DELETE TEAM SUCCESS!")
     } catch (error) {
-      console.error("❌ DELETE TEAM ERROR:", error)
-      alert("Failed to delete team. Please try again.")
+      console.error("DELETE TEAM ERROR:", error)
+      alert(formatSupabaseError(error, "Failed to delete team. Please try again."))
     }
   }
 
   const handleTogglePayment = async (team: Team) => {
+    if (!requireAdmin("update payment status")) return
+    if (updatingPaidId !== null) return
+
+    setUpdatingPaidId(team.id)
     try {
       await updateTeam(team.id, { paid: !team.paid })
     } catch (error) {
       console.error("Error updating payment status:", error)
-      alert("Failed to update payment status. Please try again.")
+      alert(formatSupabaseError(error, "Failed to update payment status. Please try again."))
+    } finally {
+      setUpdatingPaidId(null)
     }
   }
 
   const editTeam = (team: Team) => {
+    if (!requireAdmin("edit teams")) return
     setEditingTeam(team)
     setTeamName(team.name)
-    setPlayer1(team.players[0])
-    setPlayer2(team.players[1])
+    setPlayer1(team.players[0] || "")
+    setPlayer2(team.players[1] || "")
   }
 
   const resetForm = () => {
@@ -131,11 +166,14 @@ export default function TeamRegistration({
     setEditingTeam(null)
   }
 
-  const canStartTournament = teams.length >= 4 && teams.length <= 16
-  const paidTeams = teams.filter(team => team.paid)
-  const unpaidTeams = teams.filter(team => !team.paid)
+  const canStartTournament =
+    teams.length >= MIN_TEAMS_TO_START && teams.length <= MAX_TEAMS
+  const paidTeams = teams.filter((team) => team.paid)
+  const unpaidTeams = teams.filter((team) => !team.paid)
 
   const generateRandomTeams = async (numTeams: number) => {
+    if (!requireAdmin("generate random teams")) return
+    const count = Math.min(Math.max(numTeams, MIN_TEAMS_TO_START), MAX_TEAMS)
     const teamNames = [
       "Thunder Bolts",
       "Fire Dragons",
@@ -190,32 +228,28 @@ export default function TeamRegistration({
       "Nova",
     ]
 
-    if (!confirm(`Generate ${numTeams} random teams? This will replace all existing teams.`)) {
+    if (!confirm(`Generate ${count} random teams? This will replace all existing teams.`)) {
       return
     }
 
     setIsSubmitting(true)
     try {
-      console.log("🔄 Generating random teams...")
 
       // Clear existing teams first (only if there are any)
       if (teams.length > 0) {
-        console.log(`🗑️ Clearing ${teams.length} existing teams...`)
         const deletePromises = teams.map((team) => deleteTeam(team.id))
         await Promise.all(deletePromises)
-        console.log("✅ Cleared existing teams")
 
         // Wait a moment for the database to update
         await new Promise((resolve) => setTimeout(resolve, 500))
       }
 
       // Add new random teams
-      console.log(`➕ Adding ${numTeams} new teams...`)
       const shuffledTeamNames = [...teamNames].sort(() => Math.random() - 0.5)
       const shuffledPlayerNames = [...playerNames].sort(() => Math.random() - 0.5)
 
-      for (let i = 0; i < numTeams; i++) {
-        const newTeam: Omit<Team, "id"> = {
+      for (let i = 0; i < count; i++) {
+        const newTeam: Omit<Team, "id" | "tournamentId"> & { tournamentId?: number } = {
           name:
             shuffledTeamNames[i % shuffledTeamNames.length] +
             (i >= shuffledTeamNames.length ? ` ${Math.floor(i / shuffledTeamNames.length) + 1}` : ""),
@@ -231,10 +265,8 @@ export default function TeamRegistration({
         }
 
         await addTeam(newTeam)
-        console.log(`✅ Added team ${i + 1}/${numTeams}: ${newTeam.name}`)
       }
 
-      console.log(`🎉 Successfully generated ${numTeams} random teams`)
     } catch (error) {
       console.error("❌ Error generating random teams:", error)
       alert(`Failed to generate random teams: ${error instanceof Error ? error.message : "Unknown error"}`)
@@ -463,11 +495,13 @@ export default function TeamRegistration({
                           id={`payment-${team.id}`}
                           checked={team.paid}
                           onCheckedChange={isAdmin ? () => handleTogglePayment(team) : undefined}
-                          disabled={isSubmitting || !isAdmin}
+                          disabled={isSubmitting || !isAdmin || updatingPaidId === team.id}
                           className="w-6 h-6"
                         />
                         <Label htmlFor={`payment-${team.id}`} className="outdoor-text text-slate-900 font-semibold">
-                          Paid $40 {!isAdmin && "(Admin Only)"}
+                          {updatingPaidId === team.id
+                            ? "Updating..."
+                            : `Paid $40${!isAdmin ? " (Admin Only)" : ""}`}
                         </Label>
                       </div>
                     </div>
@@ -497,9 +531,9 @@ export default function TeamRegistration({
                 {!canStartTournament && (
                   <div className="p-3 bg-orange-100 rounded-lg border border-orange-200">
                     <p className="text-sm sm:text-base text-orange-800 font-bold">
-                      {teams.length < 4
-                        ? `Need at least 4 teams to start tournament (currently ${teams.length})`
-                        : `Maximum 16 teams allowed (currently ${teams.length})`}
+                      {teams.length < MIN_TEAMS_TO_START
+                        ? `Need at least ${MIN_TEAMS_TO_START} teams to start tournament (currently ${teams.length})`
+                        : `Maximum ${MAX_TEAMS} teams allowed (currently ${teams.length})`}
                     </p>
                   </div>
                 )}
@@ -515,6 +549,7 @@ export default function TeamRegistration({
               
               <Button
                 onClick={async () => {
+                  if (!requireAdmin("start the tournament")) return
                   try {
                     await onStartTournament()
                   } catch (error) {

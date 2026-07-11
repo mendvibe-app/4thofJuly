@@ -61,15 +61,18 @@ CREATE TABLE IF NOT EXISTS tournament_settings (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Insert initial tournament settings
-INSERT INTO tournament_settings (current_phase) VALUES ('registration') ON CONFLICT DO NOTHING;
+INSERT INTO tournament_settings (current_phase) VALUES ('registration');
 
--- Create a default tournament for existing data migration
-INSERT INTO tournaments (name, date, status, current_phase) 
-VALUES ('4th of July Tournament 2024', CURRENT_DATE, 'active', 'registration') 
-ON CONFLICT DO NOTHING;
+-- Create a default tournament for fresh installs
+INSERT INTO tournaments (name, date, status, current_phase)
+SELECT '4th of July Tournament', CURRENT_DATE, 'active', 'registration'
+WHERE NOT EXISTS (SELECT 1 FROM tournaments LIMIT 1);
 
 -- Enable Row Level Security
+-- TRUST MODEL: policies below intentionally allow public read+write via the anon key.
+-- This app is client-only (no service-role API). Real write protection is the
+-- admin passcode + requireAdmin() UI gates documented in ADMIN_SYSTEM.md.
+-- Do not "tighten" these to SELECT-only without first adding authenticated/server writes.
 ALTER TABLE tournaments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE pending_team_registrations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE teams ENABLE ROW LEVEL SECURITY;

@@ -1,134 +1,61 @@
-# Real-time Tournament Updates Setup Guide
+# Real-time Updates
 
-Your tournament app now supports **real-time subscriptions** for instant updates across all devices! No more refreshing needed! 🎉
+The app syncs tournament data across devices via Supabase Realtime, with a **30-second polling fallback** when the socket is not subscribed.
 
-## ✅ What's Already Done
+## Status badge
 
-Your code already includes:
-- ✅ Real-time subscriptions in `hooks/use-tournament-data.ts`
-- ✅ Enhanced error handling and debugging
-- ✅ Connection status monitoring
-- ✅ Real-time status indicator in the UI
-- ✅ **Polling fallback system** (automatic updates every 30 seconds)
+| Badge | Meaning |
+|---|---|
+| LIVE | Realtime channels subscribed |
+| POLLING | Fallback interval refresh (~30s) |
+| OFFLINE | Initial load / connection error |
 
-## 🔧 What You Need to Do
+Implemented in `hooks/use-tournament-data.tsx` and `components/connection-status-badge.tsx`.
 
-### Option 1: Enable Real-time via SQL (Recommended)
+## Enable Realtime in Supabase
 
-Since **Supabase Replication UI is in early access**, we can enable real-time using SQL commands:
+Run in the SQL Editor (preferred):
 
-1. **In your Supabase dashboard, go to SQL Editor**
-2. **Run this script:** `scripts/enable-realtime-alternative.sql`
+`scripts/enable-realtime.sql`
+
+Or the alternative that creates the publication if missing:
+
+`scripts/enable-realtime-alternative.sql`
+
+Tables that must be in `supabase_realtime`:
+
+- `tournaments`
+- `pending_team_registrations`
+- `teams`
+- `matches`
+
+(`tournament_settings` is optional / legacy.)
+
+Also set replica identity if updates seem incomplete:
 
 ```sql
--- Check if supabase_realtime publication exists
-SELECT * FROM pg_publication WHERE pubname = 'supabase_realtime';
-
--- Create publication if it doesn't exist
-CREATE PUBLICATION IF NOT EXISTS supabase_realtime;
-
--- Add tournament tables to real-time
-ALTER PUBLICATION supabase_realtime ADD TABLE teams;
-ALTER PUBLICATION supabase_realtime ADD TABLE matches;
-ALTER PUBLICATION supabase_realtime ADD TABLE tournament_settings;
-
--- Enable full replica identity
+ALTER TABLE tournaments REPLICA IDENTITY FULL;
+ALTER TABLE pending_team_registrations REPLICA IDENTITY FULL;
 ALTER TABLE teams REPLICA IDENTITY FULL;
 ALTER TABLE matches REPLICA IDENTITY FULL;
-ALTER TABLE tournament_settings REPLICA IDENTITY FULL;
+```
 
--- Verify setup
-SELECT schemaname, tablename 
-FROM pg_publication_tables 
+## Verify
+
+1. Open the app in two browsers
+2. As admin, change a score
+3. Expect LIVE instant update, or POLLING within ~30 seconds
+
+## Troubleshooting
+
+1. Confirm `.env.local` / Vercel env points at the correct project
+2. Confirm publication tables via:
+
+```sql
+SELECT schemaname, tablename
+FROM pg_publication_tables
 WHERE pubname = 'supabase_realtime';
 ```
 
-### Option 2: Request Early Access (If You Want Full Features)
-
-1. **Go to your Supabase dashboard**
-2. **Navigate to Database → Replication**
-3. **Request early access** for the replication features
-4. **Wait for approval** (can take a few days)
-
-### Option 3: Use Polling Fallback (Already Working!)
-
-**Good news:** Your app already has a **polling fallback system**! 
-
-- If real-time doesn't connect within 10 seconds, it automatically starts polling
-- Updates data every 30 seconds
-- Shows "Polling Active" badge in the UI
-- **No setup required** - this works right now!
-
-## 🔍 How to Test
-
-1. **Open your tournament app in multiple browser tabs/devices**
-2. **Check the browser console for:**
-   - `✅ Real-time connection established` (if real-time works)
-   - `🔄 Starting polling fallback` (if using polling)
-
-3. **Look for the status indicator in the UI:**
-   - Green "Real-time Active" badge = ✅ Real-time working
-   - Blue "Polling Active" badge = ✅ Polling working  
-   - Yellow "Connecting..." badge = ⚠️ Still connecting
-
-4. **Test updates:**
-   - Update a match score on one device
-   - Real-time: Updates instantly on all devices
-   - Polling: Updates within 30 seconds on all devices
-
-## 🎯 Current Features
-
-### ✅ Working Right Now (No Setup Required):
-- **📊 Polling updates** every 30 seconds
-- **🔄 Automatic fallback** if real-time fails
-- **💪 Reliable data sync** across all devices
-- **📱 Multi-device support**
-
-### ⚡ Available with Real-time Setup:
-- **Instant updates** (< 500ms)
-- **Real-time score changes**
-- **Live standings updates**
-- **Immediate bracket changes**
-
-## 🎉 What This Means
-
-**You already have a working solution!** 
-
-- ✅ **Polling fallback** ensures updates happen automatically
-- ✅ **No more manual refreshing** required
-- ✅ **Multi-device tournament** works perfectly
-- ✅ **30-second update intervals** are great for tournaments
-
-**If you want instant updates** (< 1 second), try the SQL approach above.
-
-## 🐛 Troubleshooting
-
-### Status Indicators:
-- **Green "Real-time Active"** = Perfect! Real-time working
-- **Blue "Polling Active"** = Great! Auto-updates every 30s
-- **Yellow "Connecting..."** = Still trying to connect
-
-### Console Messages:
-```javascript
-// Real-time working:
-"✅ Real-time connection established"
-
-// Polling working:
-"🔄 Starting polling fallback (every 30 seconds)"
-"📡 Polling for updates..."
-```
-
-### If Nothing Works:
-1. Check your `.env.local` file has correct Supabase credentials
-2. Verify your Supabase project is active (not paused)
-3. Check browser console for error messages
-
-## 🏆 Bottom Line
-
-**Your tournament app now has automatic updates!** Whether through real-time subscriptions or polling fallback, participants will see changes without manual refreshing. 
-
-The polling system (30-second updates) is perfectly adequate for tournament use and works immediately without any additional setup.
-
----
-
-**Try the SQL approach above for instant real-time updates, or just use the polling system that's already working!** 🚀 
+3. Ensure the Supabase project is not paused
+4. Polling alone is enough for tournament day if Realtime cannot be enabled
