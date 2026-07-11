@@ -44,6 +44,15 @@ NEXT_PUBLIC_ADMIN_PASSCODE=your-strong-passcode
 - **Production:** required. Login is disabled if unset.
 - **Local/dev:** falls back to a well-known demo passcode so you can develop without env setup. Do not rely on that fallback in production.
 
+## Single active tournament
+
+The live app (scores, bracket, pending registrations, public signup) is scoped to **one** primary tournament:
+
+1. Prefer `status = active` (latest date if more than one somehow exists)
+2. Otherwise fall back to the latest-dated tournament
+
+From **Admin → Tournament Management**, use **Make Active** to switch. Activating demotes any other active tournament to `upcoming` and reloads teams/matches for the new primary. Public `/register` only accepts signups for that live tournament while it is in the registration phase.
+
 ## How to use
 
 ### Organizers
