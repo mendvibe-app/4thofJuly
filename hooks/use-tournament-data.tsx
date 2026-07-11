@@ -18,6 +18,7 @@ import type {
   PendingRegistration,
 } from "@/types/tournament"
 import { supabase } from "@/lib/supabase"
+import { pickPrimaryTournament } from "@/lib/tournaments"
 import type { RealtimeChannel } from "@supabase/supabase-js"
 
 const POLL_INTERVAL_MS = 30_000
@@ -42,6 +43,7 @@ export type TournamentDataValue = {
   ) => Promise<void>
   updateTournament: (tournamentId: number, updates: Partial<Tournament>) => Promise<void>
   deleteTournament: (tournamentId: number) => Promise<void>
+  setActiveTournament: (tournamentId: number) => Promise<void>
   addTeam: (team: Omit<Team, "id" | "tournamentId"> & { tournamentId?: number }) => Promise<void>
   updateTeam: (teamId: number, updates: Partial<Team>) => Promise<void>
   deleteTeam: (teamId: number) => Promise<void>
@@ -54,7 +56,7 @@ export type TournamentDataValue = {
   updateTournamentPhase: (phase: TournamentPhase) => Promise<void>
   setByeTeamId: (teamId: number | null) => Promise<void>
   resetTournament: () => Promise<void>
-  loadTournaments: () => Promise<void>
+  loadTournaments: () => Promise<boolean>
   loadPendingRegistrations: () => Promise<void>
   loadTeams: () => Promise<void>
   loadMatches: () => Promise<void>
@@ -130,22 +132,31 @@ function useTournamentDataState(): TournamentDataValue {
     setPrimaryTournamentId(id)
   }, [])
 
+  const demoteOtherActiveTournaments = useCallback(async (exceptId: number) => {
+    const { error } = await supabase
+      .from("tournaments")
+      .update({ status: "upcoming" })
+      .eq("status", "active")
+      .neq("id", exceptId)
+
+    if (error && error.code !== "42P01") throw error
+  }, [])
+
   const ensurePrimaryTournament = useCallback(async (): Promise<number> => {
     if (primaryTournamentIdRef.current) {
       return primaryTournamentIdRef.current
     }
 
-    const { data, error } = await supabase
-      .from("tournaments")
-      .select("*")
-      .order("date", { ascending: false })
-      .limit(1)
+    const { data, error } = await supabase.from("tournaments").select("*")
 
     if (error && error.code !== "42P01") throw error
 
-    if (data && data.length > 0) {
-      syncPrimaryId(data[0].id)
-      return data[0].id
+    const formatted = (data ?? []).map(mapTournament)
+    const primary = pickPrimaryTournament(formatted)
+
+    if (primary) {
+      syncPrimaryId(primary.id)
+      return primary.id
     }
 
     const { data: newTournament, error: createError } = await supabase
@@ -165,7 +176,7 @@ function useTournamentDataState(): TournamentDataValue {
     return newTournament.id
   }, [syncPrimaryId])
 
-  const loadTournaments = useCallback(async () => {
+  const loadTournaments = useCallback(async (): Promise<boolean> => {
     try {
       const { data, error } = await supabase
         .from("tournaments")
@@ -175,7 +186,8 @@ function useTournamentDataState(): TournamentDataValue {
       if (error) {
         if (error.code === "42P01") {
           setTournaments([])
-          return
+          syncPrimaryId(null)
+          return true
         }
         throw error
       }
@@ -183,21 +195,24 @@ function useTournamentDataState(): TournamentDataValue {
       const formatted = (data ?? []).map(mapTournament)
       setTournaments(formatted)
 
-      const activeId = primaryTournamentIdRef.current
-      const active = activeId
-        ? formatted.find((t) => t.id === activeId)
-        : formatted[0]
+      const previousId = primaryTournamentIdRef.current
+      const primary = pickPrimaryTournament(formatted)
 
-      if (active) {
-        syncPrimaryId(active.id)
-        setCurrentPhase(active.currentPhase)
-        if (!active.byeTeamId) {
+      if (primary) {
+        syncPrimaryId(primary.id)
+        setCurrentPhase(primary.currentPhase)
+        if (!primary.byeTeamId) {
           setByeTeam(null)
         }
+        return primary.id !== previousId
       }
+
+      syncPrimaryId(null)
+      return previousId !== null
     } catch (error) {
       console.error("Error loading tournaments:", error)
       setTournaments([])
+      return false
     }
   }, [syncPrimaryId])
 
@@ -434,7 +449,18 @@ function useTournamentDataState(): TournamentDataValue {
           "postgres_changes",
           { event: "*", schema: "public", table: "tournaments" },
           () => {
-            void loadTournaments().then(() => loadPrimaryTournamentState())
+            void loadTournaments().then((primaryChanged) => {
+              if (primaryChanged) {
+                void Promise.all([
+                  loadPendingRegistrations(),
+                  loadTeams(),
+                  loadMatches(),
+                  loadPrimaryTournamentState(),
+                ])
+              } else {
+                void loadPrimaryTournamentState()
+              }
+            })
           },
         )
         .subscribe((status) => {
@@ -536,40 +562,77 @@ function useTournamentDataState(): TournamentDataValue {
 
   const createTournament = useCallback(
     async (tournament: Omit<Tournament, "id" | "createdAt" | "updatedAt">) => {
-      const { error } = await supabase.from("tournaments").insert({
-        name: tournament.name,
-        date: tournament.date,
-        status: tournament.status,
-        current_phase: tournament.currentPhase,
-        bye_team_id: tournament.byeTeamId,
-      })
+      if (tournament.status === "active") {
+        await demoteOtherActiveTournaments(-1)
+      }
+
+      const { data, error } = await supabase
+        .from("tournaments")
+        .insert({
+          name: tournament.name,
+          date: tournament.date,
+          status: tournament.status,
+          current_phase: tournament.currentPhase,
+          bye_team_id: tournament.byeTeamId,
+        })
+        .select()
+        .single()
 
       if (error) throw error
-      await loadTournaments()
+
+      if (tournament.status === "active" && data) {
+        syncPrimaryId(data.id)
+      }
+
+      await refreshScopedData()
     },
-    [loadTournaments],
+    [demoteOtherActiveTournaments, refreshScopedData, syncPrimaryId],
   )
 
   const updateTournament = useCallback(
     async (tournamentId: number, updates: Partial<Tournament>) => {
+      if (updates.status === "active") {
+        await demoteOtherActiveTournaments(tournamentId)
+      }
+
+      const payload: Record<string, unknown> = {}
+      if (updates.name !== undefined) payload.name = updates.name
+      if (updates.date !== undefined) payload.date = updates.date
+      if (updates.status !== undefined) payload.status = updates.status
+      if (updates.currentPhase !== undefined) payload.current_phase = updates.currentPhase
+      if (updates.byeTeamId !== undefined) payload.bye_team_id = updates.byeTeamId
+
       const { error } = await supabase
         .from("tournaments")
-        .update({
-          name: updates.name,
-          date: updates.date,
-          status: updates.status,
-          current_phase: updates.currentPhase,
-          bye_team_id: updates.byeTeamId,
-        })
+        .update(payload)
         .eq("id", tournamentId)
 
       if (error) throw error
-      await loadTournaments()
-      if (tournamentId === primaryTournamentIdRef.current) {
-        await loadPrimaryTournamentState()
+
+      if (updates.status === "active") {
+        syncPrimaryId(tournamentId)
       }
+
+      await refreshScopedData()
     },
-    [loadTournaments, loadPrimaryTournamentState],
+    [demoteOtherActiveTournaments, refreshScopedData, syncPrimaryId],
+  )
+
+  const setActiveTournament = useCallback(
+    async (tournamentId: number) => {
+      await demoteOtherActiveTournaments(tournamentId)
+
+      const { error } = await supabase
+        .from("tournaments")
+        .update({ status: "active" })
+        .eq("id", tournamentId)
+
+      if (error) throw error
+
+      syncPrimaryId(tournamentId)
+      await refreshScopedData()
+    },
+    [demoteOtherActiveTournaments, refreshScopedData, syncPrimaryId],
   )
 
   const deleteTournament = useCallback(
@@ -762,6 +825,7 @@ function useTournamentDataState(): TournamentDataValue {
       createTournament,
       updateTournament,
       deleteTournament,
+      setActiveTournament,
       addTeam,
       updateTeam,
       deleteTeam,
@@ -791,6 +855,7 @@ function useTournamentDataState(): TournamentDataValue {
       createTournament,
       updateTournament,
       deleteTournament,
+      setActiveTournament,
       addTeam,
       updateTeam,
       deleteTeam,

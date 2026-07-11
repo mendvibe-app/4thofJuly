@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Shield, LogOut, ArrowLeft, User, Trophy, Users, Clock } from "lucide-react"
+import { Shield, LogOut, ArrowLeft, Trophy, Users } from "lucide-react"
 import { useAdmin } from "@/hooks/use-admin"
 import { useRouter } from "next/navigation"
 import { useTournamentData } from "@/hooks/use-tournament-data"
@@ -20,11 +20,16 @@ export default function AdminPage() {
   const router = useRouter()
   
   const { isAdmin, adminName: currentAdminName, loginAsAdmin, logoutAdmin, passcodeConfigured } = useAdmin()
-  const { 
-    tournaments, 
+  const {
+    tournaments,
     pendingRegistrations,
     teams,
-    loadTournaments, 
+    primaryTournamentId,
+    createTournament,
+    updateTournament,
+    deleteTournament,
+    setActiveTournament,
+    loadTournaments,
     loadPendingRegistrations,
     loadTeams,
   } = useTournamentData()
@@ -161,9 +166,11 @@ export default function AdminPage() {
               <TabsContent value="tournaments" className="space-y-6">
                 <AdminTournamentManagement
                   tournaments={tournaments}
-                  onTournamentCreated={handleDataUpdated}
-                  onTournamentUpdated={handleDataUpdated}
-                  onTournamentDeleted={handleDataUpdated}
+                  primaryTournamentId={primaryTournamentId}
+                  createTournament={createTournament}
+                  updateTournament={updateTournament}
+                  deleteTournament={deleteTournament}
+                  setActiveTournament={setActiveTournament}
                 />
               </TabsContent>
 

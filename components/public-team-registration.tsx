@@ -40,15 +40,14 @@ export default function PublicTeamRegistration({
   const [submittedTeamName, setSubmittedTeamName] = useState("")
   const [error, setError] = useState("")
 
-  const availableTournaments = useMemo(
-    () =>
-      tournaments.filter(
-        (t) =>
-          t.currentPhase === "registration" &&
-          (t.status === "active" || t.status === "upcoming"),
-      ),
-    [tournaments],
-  )
+  // Public signup only for the live (primary/active) tournament while in registration
+  const availableTournaments = useMemo(() => {
+    return tournaments.filter((t) => {
+      if (t.currentPhase !== "registration") return false
+      if (primaryTournamentId != null) return t.id === primaryTournamentId
+      return t.status === "active"
+    })
+  }, [tournaments, primaryTournamentId])
 
   // Prefer the primary tournament when it's open for registration
   useEffect(() => {
