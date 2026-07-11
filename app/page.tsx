@@ -58,7 +58,7 @@ export default function TournamentApp() {
     resetTournament,
   } = useTournamentData()
 
-  const { isAdmin, adminName: currentAdminName, logoutAdmin } = useAdmin()
+  const { isAdmin, adminName: currentAdminName, logoutAdmin, requireAdmin } = useAdmin()
 
   const handleAdminLogout = () => {
     logoutAdmin()
@@ -66,10 +66,7 @@ export default function TournamentApp() {
   }
 
   const handleResetTournament = async () => {
-    if (!isAdmin) {
-      alert("Admin access required to reset the tournament.")
-      return
-    }
+    if (!requireAdmin("reset the tournament")) return
     if (!confirm("Reset the entire tournament? This deletes all teams and matches.")) {
       return
     }
@@ -79,6 +76,7 @@ export default function TournamentApp() {
 
   const handlePhaseChange = (phaseId: string) => {
     if (!isTournamentPhase(phaseId)) return
+    if (!requireAdmin("change the tournament phase")) return
     void updateTournamentPhase(phaseId)
   }
 
@@ -457,12 +455,21 @@ export default function TournamentApp() {
             {navigationItems.map((item) => {
               const Icon = item.icon
               const isActive = currentPhase === item.id
+              const phaseLocked = !isAdmin && !isActive
+              const disabled = item.disabled || phaseLocked
 
               return (
                 <button
                   key={item.id}
-                  onClick={() => !item.disabled && handlePhaseChange(item.id)}
-                  disabled={item.disabled}
+                  onClick={() => !disabled && handlePhaseChange(item.id)}
+                  disabled={disabled}
+                  title={
+                    phaseLocked
+                      ? "Admin access required to change phase"
+                      : item.disabled
+                        ? "Not available yet"
+                        : undefined
+                  }
                   className={`
                     flex-1 flex flex-col items-center justify-center
                     touch-target relative transition-all duration-200
@@ -471,7 +478,7 @@ export default function TournamentApp() {
                         ? "text-white transform scale-110"
                         : "text-white/80 hover:text-white"
                     }
-                    ${item.disabled ? "opacity-40 cursor-not-allowed" : "hover:bg-white/10 rounded-xl"}
+                    ${disabled ? "opacity-40 cursor-not-allowed" : "hover:bg-white/10 rounded-xl"}
                   `}
                 >
                   <div className="relative">

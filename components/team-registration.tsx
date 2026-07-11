@@ -26,7 +26,7 @@ export default function TeamRegistration({
   deleteTeam,
   onStartTournament,
 }: TeamRegistrationProps) {
-  const { isAdmin } = useAdmin()
+  const { isAdmin, requireAdmin } = useAdmin()
   const [teamName, setTeamName] = useState("")
   const [player1, setPlayer1] = useState("")
   const [player2, setPlayer2] = useState("")
@@ -34,13 +34,7 @@ export default function TeamRegistration({
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleAddTeam = async () => {
-    console.log("🎯 ADD TEAM DEBUG:", {
-      teamName: teamName.trim(),
-      player1: player1.trim(),
-      player2: player2.trim(),
-      isSubmitting
-    })
-    
+    if (!requireAdmin("add teams")) return
     if (!teamName.trim() || !player1.trim() || !player2.trim() || isSubmitting) {
       return
     }
@@ -68,6 +62,7 @@ export default function TeamRegistration({
   }
 
   const handleUpdateTeam = async () => {
+    if (!requireAdmin("update teams")) return
     if (!editingTeam || !teamName.trim() || !player1.trim() || !player2.trim() || isSubmitting) return
 
     setIsSubmitting(true)
@@ -86,7 +81,7 @@ export default function TeamRegistration({
   }
 
   const handleDeleteTeam = async (teamId: number) => {
-    
+    if (!requireAdmin("delete teams")) return
     if (!confirm("Are you sure you want to delete this team?")) {
       return
     }
@@ -100,6 +95,7 @@ export default function TeamRegistration({
   }
 
   const handleTogglePayment = async (team: Team) => {
+    if (!requireAdmin("update payment status")) return
     try {
       await updateTeam(team.id, { paid: !team.paid })
     } catch (error) {
@@ -109,6 +105,7 @@ export default function TeamRegistration({
   }
 
   const editTeam = (team: Team) => {
+    if (!requireAdmin("edit teams")) return
     setEditingTeam(team)
     setTeamName(team.name)
     setPlayer1(team.players[0])
@@ -127,6 +124,7 @@ export default function TeamRegistration({
   const unpaidTeams = teams.filter(team => !team.paid)
 
   const generateRandomTeams = async (numTeams: number) => {
+    if (!requireAdmin("generate random teams")) return
     const teamNames = [
       "Thunder Bolts",
       "Fire Dragons",
@@ -500,6 +498,7 @@ export default function TeamRegistration({
               
               <Button
                 onClick={async () => {
+                  if (!requireAdmin("start the tournament")) return
                   try {
                     await onStartTournament()
                   } catch (error) {

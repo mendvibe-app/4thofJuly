@@ -70,26 +70,32 @@ Make sure to set these in your production environment:
 ```env
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+NEXT_PUBLIC_ADMIN_PASSCODE=your-strong-admin-passcode
 ```
 
 ## Admin System - Production Notes
 
 ### Admin Passcode
-The admin system uses this passcode (you can change it in `hooks/use-admin.ts`):
-- `july4admin`
+Set `NEXT_PUBLIC_ADMIN_PASSCODE` in Vercel (or your host). Do **not** commit the real passcode.
+Production login is disabled if this variable is missing.
+
+See `ADMIN_SYSTEM.md` for the full trust model (client-side gates + open RLS by design for this architecture).
 
 ### Security Features
 - ✅ 48-hour session timeout
-- ✅ Client-side only (no database storage)
-- ✅ Multiple users can use same passcode
-- ✅ Easy passcode rotation
+- ✅ Client-side admin session (localStorage)
+- ✅ Mutating UI actions gated with `requireAdmin()`
+- ✅ Spectators cannot change tournament phase via bottom nav
+- ✅ Knockout auto-advance only runs in admin browsers
+- ✅ Easy passcode rotation via env + redeploy
 
 ### Production Checklist
-- [ ] Environment variables configured
+- [ ] Environment variables configured (including admin passcode)
 - [ ] Supabase database tables created
-- [ ] Admin passcode communicated to tournament staff
+- [ ] Admin passcode communicated privately to tournament staff
 - [ ] Real-time subscriptions enabled in Supabase
 - [ ] Test admin login on production site
+- [ ] Test that a logged-out browser cannot edit scores or change phase
 - [ ] Test score updates with admin access
 
 ## Automatic Deployments

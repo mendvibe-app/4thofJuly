@@ -20,7 +20,7 @@ interface KnockoutBracketProps {
 }
 
 export default function KnockoutBracket({ matches, poolPlayMatches, updateMatch, createMatches, byeTeam, allTeams }: KnockoutBracketProps) {
-  const { isAdmin } = useAdmin()
+  const { isAdmin, requireAdmin } = useAdmin()
   const [editingMatch, setEditingMatch] = useState<Match | null>(null)
   const [team1Score, setTeam1Score] = useState("")
   const [team2Score, setTeam2Score] = useState("")
@@ -193,9 +193,10 @@ export default function KnockoutBracket({ matches, poolPlayMatches, updateMatch,
     return 15 // All earlier rounds
   }
 
-  // Advancement logic
+  // Advancement logic — admin only so spectators' browsers don't create matches
   useEffect(() => {
     const advanceWinners = async () => {
+      if (!isAdmin) return
       if (!matches || matches.length === 0) return
       
       // Get knockout matches only
@@ -409,10 +410,11 @@ export default function KnockoutBracket({ matches, poolPlayMatches, updateMatch,
     }
     
     advanceWinners()
-  }, [matches, byeTeams])
+  }, [matches, byeTeams, isAdmin])
 
   // Score update handler (Supabase version)
   const updateMatchScore = async (completeGame: boolean = false) => {
+    if (!requireAdmin("edit knockout scores")) return
     if (!editingMatch || team1Score === "" || team2Score === "") return
     const score1 = Number.parseInt(team1Score)
     const score2 = Number.parseInt(team2Score)
@@ -435,6 +437,7 @@ export default function KnockoutBracket({ matches, poolPlayMatches, updateMatch,
   }
 
   const editMatch = (match: Match) => {
+    if (!requireAdmin("edit knockout scores")) return
     setEditingMatch(match)
     setTeam1Score(match.completed ? match.team1Score.toString() : "")
     setTeam2Score(match.completed ? match.team2Score.toString() : "")

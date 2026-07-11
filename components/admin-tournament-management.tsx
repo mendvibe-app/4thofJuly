@@ -29,6 +29,7 @@ import {
 } from "lucide-react"
 import type { Tournament, TournamentStatus, TournamentPhase } from "@/types/tournament"
 import { supabase } from "@/lib/supabase"
+import { useAdmin } from "@/hooks/use-admin"
 
 interface AdminTournamentManagementProps {
   tournaments: Tournament[]
@@ -43,6 +44,7 @@ export default function AdminTournamentManagement({
   onTournamentUpdated,
   onTournamentDeleted,
 }: AdminTournamentManagementProps) {
+  const { requireAdmin } = useAdmin()
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [editingTournament, setEditingTournament] = useState<Tournament | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -63,12 +65,14 @@ export default function AdminTournamentManagement({
   }
 
   const openCreateDialog = () => {
+    if (!requireAdmin("create tournaments")) return
     resetForm()
     setEditingTournament(null)
     setIsCreateDialogOpen(true)
   }
 
   const openEditDialog = (tournament: Tournament) => {
+    if (!requireAdmin("edit tournaments")) return
     setName(tournament.name)
     setDate(tournament.date.split('T')[0]) // Format for date input
     setStatus(tournament.status)
@@ -80,6 +84,7 @@ export default function AdminTournamentManagement({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!requireAdmin(editingTournament ? "update tournaments" : "create tournaments")) return
     setError("")
 
     if (!name.trim()) {
@@ -136,6 +141,7 @@ export default function AdminTournamentManagement({
   }
 
   const handleDeleteTournament = async (tournament: Tournament) => {
+    if (!requireAdmin("delete tournaments")) return
     if (!confirm(`Are you sure you want to delete "${tournament.name}"? This will also delete all teams and matches for this tournament.`)) {
       return
     }

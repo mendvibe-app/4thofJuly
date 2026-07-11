@@ -32,9 +32,12 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_actual_supabase_anon_key
 
 ### Step 1: Environment Setup
 ```bash
-# Create .env.local file (replace with your actual values)
-echo 'NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co' > .env.local
-echo 'NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here' >> .env.local
+# Copy the example env file and fill in values
+cp .env.example .env.local
+# Edit .env.local:
+#   NEXT_PUBLIC_SUPABASE_URL=...
+#   NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+#   NEXT_PUBLIC_ADMIN_PASSCODE=...   # optional locally; required in production
 ```
 
 ### Step 2: Database Setup

@@ -70,6 +70,10 @@ VALUES ('4th of July Tournament 2024', CURRENT_DATE, 'active', 'registration')
 ON CONFLICT DO NOTHING;
 
 -- Enable Row Level Security
+-- TRUST MODEL: policies below intentionally allow public read+write via the anon key.
+-- This app is client-only (no service-role API). Real write protection is the
+-- admin passcode + requireAdmin() UI gates documented in ADMIN_SYSTEM.md.
+-- Do not "tighten" these to SELECT-only without first adding authenticated/server writes.
 ALTER TABLE tournaments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE pending_team_registrations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE teams ENABLE ROW LEVEL SECURITY;

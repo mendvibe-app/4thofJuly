@@ -30,7 +30,7 @@ export default function PoolPlay({
   setByeTeamId,
   resetTournament,
 }: PoolPlayProps) {
-  const { isAdmin } = useAdmin()
+  const { isAdmin, requireAdmin } = useAdmin()
   const [gamesPerTeam, setGamesPerTeam] = useState(3)
   const [isGenerating, setIsGenerating] = useState(false)
   const [editingMatch, setEditingMatch] = useState<number | null>(null)
@@ -86,6 +86,7 @@ export default function PoolPlay({
   }
 
   const generateMatches = async () => {
+    if (!requireAdmin("generate pool play matches")) return
     if (teams.length < 4) return
 
     setIsGenerating(true)
@@ -423,10 +424,7 @@ export default function PoolPlay({
   }
 
   const generateKnockoutBracket = async () => {
-    if (!isAdmin) {
-      alert("Admin access required to generate knockout bracket!")
-      return
-    }
+    if (!requireAdmin("generate the knockout bracket")) return
 
     const standings = calculateStandings()
     const completedMatches = matches.filter((match) => match.completed)
@@ -568,6 +566,8 @@ export default function PoolPlay({
   }
 
   const handleScoreUpdate = async (matchId: number, completeGame: boolean = false) => {
+    if (!requireAdmin("edit match scores")) return
+
     const t1Score = Number.parseInt(team1Score) || 0
     const t2Score = Number.parseInt(team2Score) || 0
 
@@ -599,6 +599,7 @@ export default function PoolPlay({
   }
 
   const startEditing = (match: Match) => {
+    if (!requireAdmin("edit match scores")) return
     setEditingMatch(match.id)
     setTeam1Score(match.team1Score.toString())
     setTeam2Score(match.team2Score.toString())
@@ -611,6 +612,7 @@ export default function PoolPlay({
   }
 
   const setQuickScore = async (matchId: number, team1Score: number, team2Score: number) => {
+    if (!requireAdmin("edit match scores")) return
     try {
       await updateMatch(matchId, {
         team1Score,
@@ -624,6 +626,7 @@ export default function PoolPlay({
   }
 
   const generateRandomScores = async () => {
+    if (!requireAdmin("generate random scores")) return
     const incompleteMatches = matches.filter((match) => !match.completed)
 
     if (incompleteMatches.length === 0) {
@@ -683,6 +686,7 @@ export default function PoolPlay({
   }
 
   const resetAllScores = async () => {
+    if (!requireAdmin("reset match scores")) return
     if (matches.length === 0) {
       alert("No matches to reset!")
       return
@@ -807,7 +811,11 @@ export default function PoolPlay({
               </Button>
               {resetTournament && (
                 <Button
-                  onClick={resetTournament}
+                  onClick={async () => {
+                    if (!requireAdmin("reset the tournament")) return
+                    if (!confirm("Reset the entire tournament? This deletes all teams and matches.")) return
+                    await resetTournament()
+                  }}
                   variant="outline"
                   className="border-red-300 text-red-700 hover:bg-red-50 h-11 font-medium bg-transparent"
                 >

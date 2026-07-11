@@ -1,125 +1,87 @@
 # Tournament Admin System
 
 ## Overview
-The tournament now has a comprehensive admin system that controls who can edit scores and manage tournament settings without requiring traditional authentication. This keeps the system simple while preventing unauthorized changes.
 
-## Features
+The tournament uses a lightweight passcode-based admin model. There are no user accounts — trusted scorekeepers enter a shared passcode and get a 48-hour browser session.
 
-### 🔐 Admin Access Control
-- **Passcode-based authentication**: No user accounts needed, just simple passcodes
-- **Session persistence**: Admin status is saved in browser localStorage for 48 hours
-- **Single admin passcode**: One simple passcode for all authorized users
-- **Easy revocation**: Passcodes can be changed instantly by updating the code
+This is intentional for a backyard / invite-only tournament day. It is **not** bank-grade auth.
 
-### 🎯 Protected Operations
-All these operations now require admin access:
-- **Score editing**: Entering/editing match scores in any tournament phase
-- **Match generation**: Creating pool play matches and knockout brackets
-- **Tournament management**: Advancing phases, generating random scores, resetting
-- **Quick score buttons**: 21-0, 0-21, 21-19 shortcuts
+## Trust model
 
-### 🔑 Admin Passcode (for tournament day)
-```
-july4admin   - Tournament admin passcode
-```
+| Layer | What it protects | What it does not |
+|---|---|---|
+| UI + `requireAdmin()` | Accidental spectator edits, casual tampering via the app UI | Anyone who opens DevTools and hits Supabase with the anon key |
+| Admin passcode (env) | Who can unlock the UI | People who already know the passcode |
+| Supabase RLS (open write) | Nothing — public write is enabled so the client-only architecture works | Real adversaries |
 
-## How to Use
+**Why RLS stays open:** this app talks to Supabase directly from the browser with the anon key. Locking writes in RLS would also lock out admins unless we add server-side API routes (service role) or Supabase Auth. That is a future hardening step, not tournament-day scope.
 
-### For Tournament Organizers
-1. **Share passcode**: Give the admin passcode to trusted scorekeepers before the tournament
-2. **Monitor admin access**: See who is logged in as admin in the top-right corner
-3. **Change passcode if needed**: Update `hooks/use-admin.ts` if access needs to be revoked
+**Practical security for event day:**
+1. Set a strong `NEXT_PUBLIC_ADMIN_PASSCODE` in Vercel (do not commit it)
+2. Share the passcode only with scorekeepers
+3. Prefer a short-lived / not widely shared site URL if possible
+4. Rotate the passcode and redeploy if it leaks
 
-### For Scorekeepers
-1. **Login**: Click the admin login card in the top-right corner
-2. **Enter credentials**: Provide your name and the admin passcode
-3. **Keep session active**: Admin status lasts 48 hours, then you'll need to re-login
-4. **Score matches**: Edit buttons will now work for updating match scores
+## Protected operations
 
-### For Players/Spectators
-- **Clean viewing experience**: See all tournament data without confusing buttons
-- **Live updates**: Scores and standings update automatically
-- **No accidental clicks**: Editing controls are completely hidden
+All of these require an active admin session:
 
-## Visual Indicators
+- Score editing (pool play + knockout), including quick-score shortcuts
+- Match generation (pool play schedule + knockout bracket)
+- Knockout auto-advancement to the next round (admin browsers only)
+- Team add / edit / delete / paid toggle / random team tools
+- Start tournament / change phase / reset tournament / reset scores
+- Tournament CRUD and pending registration approve/reject
 
-### 🟢 Admin Mode Active
-- Green admin card showing logged-in user name
-- All edit buttons and admin functions are enabled
-- No warning messages about admin access
+Spectators see live data without edit controls. Bottom-nav phase tabs are locked for non-admins so spectators cannot advance the tournament by tapping around.
 
-### 🟡 Non-Admin (Spectator) Mode  
-- Clean interface with no editing buttons visible
-- Helpful blue notices explaining spectator mode
-- Live score updates as admins make changes
+## Passcode configuration
 
-### 🔒 Security Features
-- **Session timeout**: Auto-logout after 48 hours
-- **Client-side only**: Admin state stored locally, not in database
-- **Easy reset**: Tournament organizer can change passcodes anytime
-- **No permanent accounts**: No user management needed
-
-## Technical Implementation
-
-### Files Modified
-- `hooks/use-admin.ts` - Admin state management and passcode validation
-- `components/admin-login.tsx` - Login/logout interface
-- `components/pool-play.tsx` - Admin protection for pool play scoring
-- `components/knockout-bracket.tsx` - Admin protection for knockout scoring  
-- `components/ncaa-bracket.tsx` - Admin protection for NCAA bracket scoring
-- `app/page.tsx` - Added admin login component to main page
-
-### Admin Protection Pattern
-All protected functions follow this pattern:
-```typescript
-const someAdminFunction = async () => {
-  if (!isAdmin) {
-    alert("Admin access required!")
-    return
-  }
-  // ... rest of function
-}
+```env
+NEXT_PUBLIC_ADMIN_PASSCODE=your-strong-passcode
 ```
 
-## Benefits
+- **Production:** required. Login is disabled if unset.
+- **Local/dev:** falls back to a well-known demo passcode so you can develop without env setup. Do not rely on that fallback in production.
 
-### ✅ For Tournament Day
-- **No setup required**: No user accounts or complex authentication
-- **Easy delegation**: Share passcodes with multiple scorekeepers
-- **Instant access**: Login takes 10 seconds
-- **Mobile friendly**: Works on phones and tablets
-- **Foolproof**: Clear indicators when admin access is needed
+## How to use
 
-### ✅ For Development
-- **Simple to maintain**: No authentication backend needed
-- **Easy to modify**: Passcodes can be changed in one file
-- **Secure enough**: Prevents accidental changes during tournament
-- **Scalable**: Can add more passcodes or features easily
+### Organizers
+1. Set `NEXT_PUBLIC_ADMIN_PASSCODE` in the deployment environment
+2. Share the passcode with trusted scorekeepers before the event
+3. Rotate and redeploy if access needs to be revoked
 
-## Emergency Procedures
+### Scorekeepers
+1. Open `/admin` (or Admin Login from the menu)
+2. Enter your name + the passcode
+3. Session lasts 48 hours in that browser
+4. Edit scores and manage the tournament from the main app
 
-### If someone unauthorized gets admin access:
-1. **Change passcode**: Update `hooks/use-admin.ts` and redeploy
-2. **Have all admins re-login**: Old sessions will become invalid
-3. **Check recent changes**: Review match scores for any suspicious updates
+### Players / spectators
+- Read-only viewing with live updates
+- Public team registration at `/register` still works (queued for admin approval)
 
-### If admin can't login:
-1. **Verify passcode**: Check spelling and capitalization
-2. **Clear browser data**: Try incognito/private browsing mode  
-3. **Check console**: Browser dev tools may show connection issues
-4. **Restart browser**: Close and reopen browser to clear any cached issues
+## Emergency procedures
 
-## Future Enhancements
+### Unauthorized admin access
+1. Change `NEXT_PUBLIC_ADMIN_PASSCODE` and redeploy
+2. Have legitimate admins re-login
+3. Spot-check recent scores / teams for unexpected changes
 
-Possible improvements for future tournaments:
-- **Audit log**: Track who changed what scores and when
-- **Role-based access**: Different permissions for different admin types
-- **Remote passcode changes**: Update passcodes through admin interface
-- **Session management**: See all active admin sessions
-- **Temporary access**: Generate time-limited admin codes
+### Admin cannot login
+1. Confirm `NEXT_PUBLIC_ADMIN_PASSCODE` is set in the environment
+2. Check spelling / capitalization of the passcode
+3. Try a private/incognito window
+4. Clear site data for the domain
+
+## Future hardening (optional)
+
+- Supabase Auth or Next.js API routes with service-role writes
+- Tighter RLS (public SELECT + authenticated INSERT/UPDATE)
+- Audit log of score changes
+- Role separation (scorekeeper vs organizer)
+- Time-limited one-time admin codes
 
 ---
 
-**Ready for Tournament Day!** 🏆🇺🇸
-
-The admin system is now active and protecting all score editing functions. Tournament organizers can confidently delegate scoring responsibilities while maintaining control over the tournament data. 
+**Ready for tournament day** when the passcode is set in production and scorekeepers are briefed.

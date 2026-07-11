@@ -41,7 +41,7 @@ export default function AdminPendingRegistrations({
   tournaments,
   onRegistrationUpdated,
 }: AdminPendingRegistrationsProps) {
-  const { adminName } = useAdmin()
+  const { adminName, requireAdmin } = useAdmin()
   const [reviewingRegistration, setReviewingRegistration] = useState<PendingRegistration | null>(null)
   const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false)
   const [adminNotes, setAdminNotes] = useState("")
@@ -49,6 +49,7 @@ export default function AdminPendingRegistrations({
   const [error, setError] = useState("")
 
   const openReviewDialog = (registration: PendingRegistration) => {
+    if (!requireAdmin("review registrations")) return
     setReviewingRegistration(registration)
     setAdminNotes(registration.adminNotes || "")
     setError("")
@@ -56,6 +57,7 @@ export default function AdminPendingRegistrations({
   }
 
   const handleApproveRegistration = async (registration: PendingRegistration, notes?: string) => {
+    if (!requireAdmin("approve registrations")) return
     setIsSubmitting(true)
     setError("")
 
@@ -100,6 +102,7 @@ export default function AdminPendingRegistrations({
   }
 
   const handleRejectRegistration = async (registration: PendingRegistration, notes?: string) => {
+    if (!requireAdmin("reject registrations")) return
     setIsSubmitting(true)
     setError("")
 
