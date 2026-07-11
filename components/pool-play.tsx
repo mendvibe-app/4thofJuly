@@ -11,6 +11,7 @@ import { Trophy, Users, Target, TrendingUp, Settings, Zap, Shuffle, RotateCcw } 
 import type { Team, Match } from "@/types/tournament"
 import { useAdmin } from "@/hooks/use-admin"
 import { calculateStandings, generatePoolPlaySchedule } from "@/lib/pool-play"
+import { buildFirstRound, seedTeamsFromPool } from "@/lib/knockout"
 
 interface PoolPlayProps {
   teams: Team[]
@@ -72,136 +73,26 @@ export default function PoolPlay({
   const generateKnockoutBracket = async () => {
     if (!requireAdmin("generate the knockout bracket")) return
 
-    const standings = calculateStandings(teams, matches)
     const completedMatches = matches.filter((match) => match.completed)
-    
+
     if (completedMatches.length === 0) {
       alert("Please complete some pool play matches first!")
       return
     }
 
     try {
-      // NEW SYSTEM: Include ALL teams in knockout phase
-      const allTeams = standings // All teams advance, no eliminations
-      
-      // VALIDATION: Check for duplicate teams
-      const teamIds = allTeams.map(t => t.id)
-      const uniqueTeamIds = [...new Set(teamIds)]
-      if (teamIds.length !== uniqueTeamIds.length) {
-        console.error(`❌ BUG DETECTED: Duplicate teams in standings!`, allTeams.map(t => `${t.name}(${t.id})`))
-        alert("Error: Duplicate teams detected in standings. Please contact admin.")
-        return
-      }
-      
-      // Calculate bracket size as next power of 2 >= total teams
-      const bracketSize = Math.pow(2, Math.ceil(Math.log2(allTeams.length)))
-      const byesNeeded = bracketSize - allTeams.length
-      
-      console.log(`👥 ${allTeams.length} teams advance (NO eliminations)`)
-      
-      // DETAILED SEEDING DEBUG
-      allTeams.forEach((team, index) => {
-        console.log(`  #${index + 1}: ${team.name} (${team.wins}W-${team.losses}L, +${team.pointsFor - team.pointsAgainst})`)
-      })
-      
-      // Distribute byes to top seeds
-      const byeTeams = allTeams.slice(0, byesNeeded)
-      const playingTeams = allTeams.slice(byesNeeded)
-      
-      // VALIDATION: Ensure no team appears in both bye and playing lists
-      const byeTeamIds = new Set(byeTeams.map(t => t.id))
-      const playingTeamIds = new Set(playingTeams.map(t => t.id))
-      const overlap = [...byeTeamIds].filter(id => playingTeamIds.has(id))
-      if (overlap.length > 0) {
-        console.error(`❌ BUG DETECTED: Teams appear in both bye and playing lists!`, overlap)
-        alert("Error: Team assignment conflict detected. Please contact admin.")
-        return
-      }
-      
-      console.log(`👋 Teams with BYES (${byeTeams.length}):`)
-      byeTeams.forEach((team, index) => {
-      })
-      
-      console.log(`🥊 Teams PLAYING first round (${playingTeams.length}):`)
-      playingTeams.forEach((team, index) => {
-        const actualSeed = allTeams.findIndex(t => t.id === team.id) + 1
-      })
-      
-      // Set bye teams (for now, just track the #1 seed as primary bye)
-      if (byeTeams.length > 0) {
-        await setByeTeamId(byeTeams[0].id) // Primary bye team for UI
-        if (byeTeams.length > 1) {
-          console.log(`✅ Additional byes: ${byeTeams.slice(1).map(t => `#${allTeams.findIndex(team => team.id === t.id) + 1} ${t.name}`).join(', ')}`)
-        }
-      } else {
-        await setByeTeamId(null)
-      }
+      const seeded = seedTeamsFromPool(teams, matches)
+      const firstRound = buildFirstRound(seeded)
 
-      // Create first round matches with proper seeding
-      const knockoutMatches: Array<Omit<Match, "id" | "tournamentId" | "tournament"> & { tournamentId?: number }> = []
-      const numMatches = Math.floor(playingTeams.length / 2)
-
-      
-      // Create matches with proper tournament seeding (highest vs lowest remaining)
-      for (let i = 0; i < numMatches; i++) {
-        const team1 = playingTeams[i]  // Higher seed among playing teams
-        const team2 = playingTeams[playingTeams.length - 1 - i]  // Lower seed
-        
-        // VALIDATION: Ensure neither team has a bye
-        if (byeTeamIds.has(team1.id)) {
-          console.error(`❌ BUG DETECTED: Bye team ${team1.name} included in first round match!`)
-          alert(`Error: Bye team ${team1.name} incorrectly scheduled for first round. Please contact admin.`)
-          return
-        }
-        if (byeTeamIds.has(team2.id)) {
-          console.error(`❌ BUG DETECTED: Bye team ${team2.name} included in first round match!`)
-          alert(`Error: Bye team ${team2.name} incorrectly scheduled for first round. Please contact admin.`)
-          return
-        }
-        
-        // Validate teams exist and are different
-        if (!team1 || !team2) {
-          console.error(`❌ BUG DETECTED: Missing teams for match ${i + 1}:`, { team1, team2 })
-          alert("Error: Missing team data for match creation. Please contact admin.")
-          return
-        }
-        if (team1.id === team2.id) {
-          console.error(`❌ BUG DETECTED: Team ${team1.name} scheduled to play itself!`)
-          alert(`Error: Team ${team1.name} scheduled to play itself. Please contact admin.`)
-          return
-        }
-        
-        // Calculate actual seed numbers including bye teams
-        const team1Seed = allTeams.findIndex(t => t.id === team1.id) + 1
-        const team2Seed = allTeams.findIndex(t => t.id === team2.id) + 1
-
-        knockoutMatches.push({
-          team1,
-          team2,
-          team1Score: 0,
-          team2Score: 0,
-          completed: false,
-          phase: "knockout",
-          round: 1,
-        })
-        
-      }
-
-      // FINAL VALIDATION: Ensure all teams are accounted for
-      const teamsInMatches = knockoutMatches.length * 2 // 2 teams per match
-      const totalTeamsPlaced = byeTeams.length + teamsInMatches
-      if (totalTeamsPlaced !== allTeams.length) {
-        console.error(`❌ BUG DETECTED: Team count mismatch!`)
-        console.error(`  Total teams: ${allTeams.length}`)
-        console.error(`  Bye teams: ${byeTeams.length}`)
-        console.error(`  Teams in matches: ${teamsInMatches}`)
-        console.error(`  Total placed: ${totalTeamsPlaced}`)
-        alert(`Error: Team count mismatch detected (${totalTeamsPlaced}/${allTeams.length} teams placed). Please contact admin.`)
+      if (!firstRound.ok) {
+        alert(`Error: ${firstRound.error}`)
         return
       }
 
-      if (knockoutMatches.length > 0) {
-        await createMatches(knockoutMatches)
+      await setByeTeamId(firstRound.primaryByeTeamId)
+
+      if (firstRound.matches.length > 0) {
+        await createMatches(firstRound.matches)
       }
 
       onAdvanceToKnockout()
