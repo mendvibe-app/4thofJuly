@@ -10,9 +10,6 @@ import {
   Trophy,
   DollarSign,
   Play,
-  WifiOff,
-  AlertCircle,
-  Radio,
   Settings,
   BarChart3,
   Flag,
@@ -20,11 +17,13 @@ import {
   X,
   Shield,
   LogOut,
+  Eye,
 } from "lucide-react"
 import TeamRegistration from "@/components/team-registration"
 import PoolPlay from "@/components/pool-play"
 import KnockoutBracket from "@/components/knockout-bracket"
 import LiveBanner from "@/components/live-banner"
+import { ConnectionStatusBadge } from "@/components/connection-status-badge"
 import { useTournamentData } from "@/hooks/use-tournament-data"
 import { useAdmin } from "@/hooks/use-admin"
 import type { TournamentPhase } from "@/types/tournament"
@@ -149,54 +148,6 @@ export default function TournamentApp() {
     }
   }
 
-  const getConnectionStatus = () => {
-    const baseClasses =
-      "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all duration-300 border-2 shadow-lg"
-
-    if (connectionStatus === "error") {
-      return (
-        <div className={`${baseClasses} bg-red-500 text-white border-white`}>
-          <WifiOff className="w-3 h-3" />
-          <span>OFFLINE</span>
-        </div>
-      )
-    }
-
-    if (connectionStatus === "connecting" || loading) {
-      return (
-        <div className={`${baseClasses} bg-blue-400 text-white border-white animate-pulse`}>
-          <AlertCircle className="w-3 h-3" />
-          <span>CONNECTING</span>
-        </div>
-      )
-    }
-
-    if (realtimeConnected) {
-      return (
-        <div className={`${baseClasses} bg-green-400 text-white border-white animate-pulse`}>
-          <Radio className="w-3 h-3" />
-          <span>LIVE</span>
-        </div>
-      )
-    }
-
-    if (isPolling) {
-      return (
-        <div className={`${baseClasses} bg-amber-500 text-white border-white`}>
-          <Radio className="w-3 h-3" />
-          <span>POLLING</span>
-        </div>
-      )
-    }
-
-    return (
-      <div className={`${baseClasses} bg-green-400 text-white border-white`}>
-        <Radio className="w-3 h-3" />
-        <span>CONNECTED</span>
-      </div>
-    )
-  }
-
   const navigationItems = [
     {
       id: "registration" as const,
@@ -244,7 +195,20 @@ export default function TournamentApp() {
         <div className="safe-area-top">
           <div className="px-4 py-4">
             <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">{getConnectionStatus()}</div>
+              <div className="flex items-center gap-2">
+                <ConnectionStatusBadge
+                  connectionStatus={connectionStatus}
+                  realtimeConnected={realtimeConnected}
+                  isPolling={isPolling}
+                  loading={loading}
+                />
+                {!isAdmin && (
+                  <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-white/15 text-white border border-white/30">
+                    <Eye className="w-3 h-3" />
+                    <span>SPECTATING</span>
+                  </div>
+                )}
+              </div>
               <Button
                 variant="ghost"
                 size="sm"
@@ -364,6 +328,23 @@ export default function TournamentApp() {
       )}
 
       <LiveBanner />
+
+      {!isAdmin && currentPhase !== "registration" && (
+        <div className="px-4 pt-3">
+          <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900 flex items-start gap-2">
+            <Eye className="w-4 h-4 mt-0.5 shrink-0" />
+            <p>
+              You&apos;re in spectator mode. Scores and bracket updates appear automatically
+              {realtimeConnected
+                ? " in realtime"
+                : isPolling
+                  ? " every ~30 seconds"
+                  : ""}
+              . Admins enter scores from a logged-in device.
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="px-4 py-6 pb-24 space-y-6">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

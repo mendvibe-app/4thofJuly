@@ -408,11 +408,12 @@ function useTournamentDataState(): TournamentDataValue {
 
   // Realtime subscriptions — single set for the provider lifetime
   useEffect(() => {
+    const channelId = Math.random().toString(36).slice(2, 10)
     const channelNames = [
-      "tournaments-changes",
-      "pending-registrations-changes",
-      "teams-changes",
-      "matches-changes",
+      `tournaments-changes-${channelId}`,
+      `pending-registrations-changes-${channelId}`,
+      `teams-changes-${channelId}`,
+      `matches-changes-${channelId}`,
     ] as const
 
     const updateRealtimeStatus = () => {
@@ -428,7 +429,7 @@ function useTournamentDataState(): TournamentDataValue {
 
     const channels: RealtimeChannel[] = [
       supabase
-        .channel("tournaments-changes")
+        .channel(channelNames[0])
         .on(
           "postgres_changes",
           { event: "*", schema: "public", table: "tournaments" },
@@ -437,11 +438,11 @@ function useTournamentDataState(): TournamentDataValue {
           },
         )
         .subscribe((status) => {
-          channelStatusesRef.current["tournaments-changes"] = status
+          channelStatusesRef.current[channelNames[0]] = status
           updateRealtimeStatus()
         }),
       supabase
-        .channel("pending-registrations-changes")
+        .channel(channelNames[1])
         .on(
           "postgres_changes",
           { event: "*", schema: "public", table: "pending_team_registrations" },
@@ -450,11 +451,11 @@ function useTournamentDataState(): TournamentDataValue {
           },
         )
         .subscribe((status) => {
-          channelStatusesRef.current["pending-registrations-changes"] = status
+          channelStatusesRef.current[channelNames[1]] = status
           updateRealtimeStatus()
         }),
       supabase
-        .channel("teams-changes")
+        .channel(channelNames[2])
         .on(
           "postgres_changes",
           { event: "*", schema: "public", table: "teams" },
@@ -463,11 +464,11 @@ function useTournamentDataState(): TournamentDataValue {
           },
         )
         .subscribe((status) => {
-          channelStatusesRef.current["teams-changes"] = status
+          channelStatusesRef.current[channelNames[2]] = status
           updateRealtimeStatus()
         }),
       supabase
-        .channel("matches-changes")
+        .channel(channelNames[3])
         .on(
           "postgres_changes",
           { event: "*", schema: "public", table: "matches" },
@@ -476,12 +477,12 @@ function useTournamentDataState(): TournamentDataValue {
           },
         )
         .subscribe((status) => {
-          channelStatusesRef.current["matches-changes"] = status
+          channelStatusesRef.current[channelNames[3]] = status
           updateRealtimeStatus()
         }),
     ]
 
-    const realtimeCheck = window.setTimeout(updateRealtimeStatus, 3000)
+    const realtimeCheck = window.setTimeout(updateRealtimeStatus, 2500)
 
     return () => {
       window.clearTimeout(realtimeCheck)
