@@ -1,5 +1,6 @@
 import type { Match, Team } from "@/types/tournament"
 import { calculateStandings } from "@/lib/pool-play"
+import { GAME_POINT } from "@/lib/scoring"
 
 export type KnockoutMatchDraft = Omit<Match, "id" | "tournamentId" | "tournament"> & {
   tournamentId?: number
@@ -52,10 +53,9 @@ export function getRoundName(round: number, bracketSize: number): string {
   return `Round ${round}`
 }
 
-export function getTargetScore(round: number, bracketSize: number): number {
-  const expectedRounds = getExpectedRounds(bracketSize)
-  if (round >= expectedRounds - 1) return 21
-  return 15
+export function getTargetScore(_round: number, _bracketSize: number): number {
+  // Published rules: games to 11 (win by 2). Same target all rounds.
+  return GAME_POINT
 }
 
 export function getMatchWinner(match: Match): Team | null {

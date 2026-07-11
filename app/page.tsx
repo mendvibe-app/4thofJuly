@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -27,6 +27,7 @@ import { ConnectionStatusBadge } from "@/components/connection-status-badge"
 import { useTournamentData } from "@/hooks/use-tournament-data"
 import { useAdmin } from "@/hooks/use-admin"
 import type { TournamentPhase } from "@/types/tournament"
+import Link from "next/link"
 
 const PHASES: TournamentPhase[] = ["registration", "pool-play", "knockout"]
 
@@ -36,6 +37,7 @@ function isTournamentPhase(value: string): value is TournamentPhase {
 
 export default function TournamentApp() {
   const [showMobileMenu, setShowMobileMenu] = useState(false)
+  const [viewPhase, setViewPhase] = useState<TournamentPhase>("registration")
 
   const {
     teams,
@@ -43,6 +45,7 @@ export default function TournamentApp() {
     knockoutMatches,
     currentPhase,
     byeTeam,
+    primaryTournamentId,
     loading,
     connectionStatus,
     realtimeConnected,
@@ -55,9 +58,15 @@ export default function TournamentApp() {
     updateTournamentPhase,
     setByeTeamId,
     resetTournament,
+    clearKnockoutMatches,
   } = useTournamentData()
 
   const { isAdmin, adminName: currentAdminName, logoutAdmin, requireAdmin } = useAdmin()
+
+  // Follow DB phase when it changes (admin advance / remote update)
+  useEffect(() => {
+    setViewPhase(currentPhase)
+  }, [currentPhase])
 
   const handleAdminLogout = () => {
     logoutAdmin()
@@ -73,17 +82,39 @@ export default function TournamentApp() {
     await resetTournament()
   }
 
-  const handlePhaseChange = (phaseId: string) => {
+  const handlePhaseNav = (phaseId: string) => {
     if (!isTournamentPhase(phaseId)) return
-    if (!requireAdmin("change the tournament phase")) return
-    void updateTournamentPhase(phaseId)
+
+    if (isAdmin) {
+      if (!requireAdmin("change the tournament phase")) return
+      void updateTournamentPhase(phaseId)
+      return
+    }
+
+    // Spectators browse without mutating tournament phase
+    setViewPhase(phaseId)
   }
 
   const totalCash = teams.filter((team) => team.paid).length * 40
   const paidTeams = teams.filter((team) => team.paid).length
 
   const renderPhaseContent = () => {
-    switch (currentPhase) {
+    if (!primaryTournamentId) {
+      return (
+        <div className="text-center space-y-4 py-10">
+          <Trophy className="w-12 h-12 mx-auto text-slate-400" />
+          <h3 className="text-xl font-bold text-slate-900">No active tournament</h3>
+          <p className="text-slate-600 max-w-md mx-auto">
+            An admin needs to create a tournament and mark it Active before the live app has data.
+          </p>
+          <Button asChild className="bg-blue-600 hover:bg-blue-700">
+            <Link href="/admin">Open Admin</Link>
+          </Button>
+        </div>
+      )
+    }
+
+    switch (viewPhase) {
       case "registration":
         return (
           <TeamRegistration
@@ -99,8 +130,10 @@ export default function TournamentApp() {
           <PoolPlay
             teams={teams}
             matches={poolPlayMatches}
+            knockoutMatches={knockoutMatches}
             updateMatch={updateMatch}
             createMatches={createMatches}
+            clearKnockoutMatches={clearKnockoutMatches}
             onAdvanceToKnockout={() => updateTournamentPhase("knockout")}
             setByeTeamId={setByeTeamId}
             resetTournament={resetTournament}
@@ -123,7 +156,7 @@ export default function TournamentApp() {
   }
 
   const getPhaseTitle = () => {
-    switch (currentPhase) {
+    switch (viewPhase) {
       case "registration":
         return "Team Registration"
       case "pool-play":
@@ -136,7 +169,7 @@ export default function TournamentApp() {
   }
 
   const getPhaseIcon = () => {
-    switch (currentPhase) {
+    switch (viewPhase) {
       case "registration":
         return <Users className="w-6 h-6" />
       case "pool-play":
@@ -160,14 +193,15 @@ export default function TournamentApp() {
       id: "pool-play" as const,
       label: "Pool Play",
       icon: Play,
-      disabled: teams.length < 4,
+      // Spectators can always browse; admins still blocked until enough teams
+      disabled: isAdmin && teams.length < 4,
       badge: poolPlayMatches.length > 0 ? poolPlayMatches.length : null,
     },
     {
       id: "knockout" as const,
       label: "Knockout",
       icon: Trophy,
-      disabled: poolPlayMatches.length === 0,
+      disabled: isAdmin && poolPlayMatches.length === 0,
       badge: knockoutMatches.length > 0 ? knockoutMatches.length : null,
     },
   ]
@@ -399,7 +433,10 @@ export default function TournamentApp() {
                 <div>
                   <p className="outdoor-text text-slate-600 font-medium">Phase</p>
                   <Badge className="usa-button-gradient text-white border-0 mt-2 px-3 py-1">
-                    {currentPhase.replace("-", " ").toUpperCase()}
+                    {viewPhase.replace("-", " ").toUpperCase()}
+                    {viewPhase !== currentPhase && (
+                      <span className="ml-1 opacity-80">(live: {currentPhase.replace("-", " ")})</span>
+                    )}
                   </Badge>
                 </div>
                 <div className="p-3 bg-purple-100 rounded-2xl">{getPhaseIcon()}</div>
@@ -418,9 +455,9 @@ export default function TournamentApp() {
                     {getPhaseTitle()}
                   </CardTitle>
                   <CardDescription className="outdoor-text text-slate-600">
-                    {currentPhase === "registration" && "Add teams and manage registrations"}
-                    {currentPhase === "pool-play" && "All teams play each other in round-robin"}
-                    {currentPhase === "knockout" && "Single elimination tournament bracket"}
+                    {viewPhase === "registration" && "Add teams and manage registrations"}
+                    {viewPhase === "pool-play" && "All teams play each other in round-robin"}
+                    {viewPhase === "knockout" && "Single elimination tournament bracket"}
                   </CardDescription>
                 </div>
               </div>
@@ -435,21 +472,20 @@ export default function TournamentApp() {
           <div className="flex px-2 py-3">
             {navigationItems.map((item) => {
               const Icon = item.icon
-              const isActive = currentPhase === item.id
-              const phaseLocked = !isAdmin && !isActive
-              const disabled = item.disabled || phaseLocked
+              const isActive = viewPhase === item.id
+              const disabled = item.disabled
 
               return (
                 <button
                   key={item.id}
-                  onClick={() => !disabled && handlePhaseChange(item.id)}
+                  onClick={() => !disabled && handlePhaseNav(item.id)}
                   disabled={disabled}
                   title={
-                    phaseLocked
-                      ? "Admin access required to change phase"
+                    !isAdmin
+                      ? "Browse this phase (view only)"
                       : item.disabled
                         ? "Not available yet"
-                        : undefined
+                        : "Set live tournament phase"
                   }
                   className={`
                     flex-1 flex flex-col items-center justify-center

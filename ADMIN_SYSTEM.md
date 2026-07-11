@@ -44,6 +44,8 @@ NEXT_PUBLIC_ADMIN_PASSCODE=your-strong-passcode
 - **Production:** required. Login is disabled if unset.
 - **Local/dev:** falls back to a well-known demo passcode so you can develop without env setup. Do not rely on that fallback in production.
 
+Sessions store a fingerprint of the configured passcode. Rotating `NEXT_PUBLIC_ADMIN_PASSCODE` and redeploying invalidates existing browser sessions on next load (cross-tab sync via `storage` events).
+
 ## Single active tournament
 
 The live app (scores, bracket, pending registrations, public signup) is scoped to **one** primary tournament:

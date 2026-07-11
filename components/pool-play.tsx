@@ -12,12 +12,20 @@ import type { Team, Match } from "@/types/tournament"
 import { useAdmin } from "@/hooks/use-admin"
 import { calculateStandings, generatePoolPlaySchedule } from "@/lib/pool-play"
 import { buildFirstRound, seedTeamsFromPool } from "@/lib/knockout"
+import {
+  BLOWOUT_LOSER,
+  BLOWOUT_WINNER,
+  CLOSE_GAME_LOSER,
+  GAME_POINT,
+} from "@/lib/scoring"
 
 interface PoolPlayProps {
   teams: Team[]
   matches: Match[]
+  knockoutMatches?: Match[]
   updateMatch: (matchId: number, updates: Partial<Match>) => Promise<void>
   createMatches: (matches: Array<Omit<Match, "id" | "tournamentId" | "tournament"> & { tournamentId?: number }>) => Promise<void>
+  clearKnockoutMatches?: () => Promise<void>
   onAdvanceToKnockout: () => void
   setByeTeamId: (teamId: number | null) => Promise<void>
   resetTournament?: () => Promise<void>
@@ -26,8 +34,10 @@ interface PoolPlayProps {
 export default function PoolPlay({
   teams,
   matches,
+  knockoutMatches = [],
   updateMatch,
   createMatches,
+  clearKnockoutMatches,
   onAdvanceToKnockout,
   setByeTeamId,
   resetTournament,
@@ -73,11 +83,33 @@ export default function PoolPlay({
   const generateKnockoutBracket = async () => {
     if (!requireAdmin("generate the knockout bracket")) return
 
-    const completedMatches = matches.filter((match) => match.completed)
-
-    if (completedMatches.length === 0) {
+    const completedPool = matches.filter((match) => match.completed)
+    if (completedPool.length === 0) {
       alert("Please complete some pool play matches first!")
       return
+    }
+
+    const total = matches.length
+    const completed = completedPool.length
+    const poolComplete = total > 0 && completed === total
+
+    if (!poolComplete) {
+      const proceed = confirm(
+        `Pool play is only ${completed}/${total} complete. Seed the knockout bracket from partial results anyway?`,
+      )
+      if (!proceed) return
+    }
+
+    if (knockoutMatches.length > 0) {
+      const regenerate = confirm(
+        "A knockout bracket already exists. Delete it and regenerate from current standings?",
+      )
+      if (!regenerate) return
+      if (!clearKnockoutMatches) {
+        alert("Cannot clear existing knockout matches. Refresh and try again.")
+        return
+      }
+      await clearKnockoutMatches()
     }
 
     try {
@@ -180,29 +212,26 @@ export default function PoolPlay({
       for (let i = 0; i < incompleteMatches.length; i++) {
         const match = incompleteMatches[i]
 
-        // More realistic scoring - games typically go to 21
-        const isCloseGame = Math.random() > 0.6 // 40% chance of close game
-        const isBlowout = Math.random() > 0.8 // 20% chance of blowout
+        // Games to GAME_POINT (win by 2), matching published rules
+        const isCloseGame = Math.random() > 0.6
+        const isBlowout = Math.random() > 0.8
 
         let team1Score, team2Score
 
         if (isBlowout) {
-          // Blowout game
           const winner = Math.random() > 0.5
-          team1Score = winner ? 21 : Math.floor(Math.random() * 8) + 5 // 5-12 points
-          team2Score = winner ? Math.floor(Math.random() * 8) + 5 : 21
+          team1Score = winner ? BLOWOUT_WINNER : Math.floor(Math.random() * 6) + 2
+          team2Score = winner ? Math.floor(Math.random() * 6) + 2 : BLOWOUT_WINNER
         } else if (isCloseGame) {
-          // Close game
           const winner = Math.random() > 0.5
-          const losingScore = Math.floor(Math.random() * 4) + 17 // 17-20 points
-          team1Score = winner ? 21 : losingScore
-          team2Score = winner ? losingScore : 21
+          const losingScore = CLOSE_GAME_LOSER - Math.floor(Math.random() * 2) // 8–9
+          team1Score = winner ? GAME_POINT : losingScore
+          team2Score = winner ? losingScore : GAME_POINT
         } else {
-          // Normal game
           const winner = Math.random() > 0.5
-          const losingScore = Math.floor(Math.random() * 8) + 10 // 10-17 points
-          team1Score = winner ? 21 : losingScore
-          team2Score = winner ? losingScore : 21
+          const losingScore = Math.floor(Math.random() * 6) + 3 // 3–8
+          team1Score = winner ? GAME_POINT : losingScore
+          team2Score = winner ? losingScore : GAME_POINT
         }
 
         await updateMatch(match.id, {
@@ -260,6 +289,8 @@ export default function PoolPlay({
   const completedMatches = matches.filter((match) => match.completed).length
   const totalMatches = matches.length
   const progressPercentage = totalMatches > 0 ? (completedMatches / totalMatches) * 100 : 0
+  const poolComplete = totalMatches > 0 && completedMatches === totalMatches
+  const showAdvance = poolComplete || progressPercentage >= 50
 
   return (
     <div className="space-y-6">
@@ -391,18 +422,22 @@ export default function PoolPlay({
                   style={{ width: `${progressPercentage}%` }}
                 ></div>
               </div>
-              {progressPercentage >= 50 && isAdmin && (
+              {showAdvance && isAdmin && (
                 <Button
                   onClick={generateKnockoutBracket}
                   className="flag-gradient h-12 font-semibold w-full transition-all duration-200"
                 >
                   <Trophy className="w-5 h-5 mr-2" />
-                  Advance to Knockout Bracket
+                  {poolComplete ? "Advance to Knockout Bracket" : "Advance Early (partial pool)"}
                 </Button>
               )}
-              {progressPercentage >= 50 && !isAdmin && (
+              {showAdvance && !isAdmin && (
                 <div className="text-center p-4 bg-green-50 rounded-lg border border-green-200">
-                  <p className="text-green-800 font-medium">🏆 Ready for knockout bracket! Contact tournament admin to advance.</p>
+                  <p className="text-green-800 font-medium">
+                    {poolComplete
+                      ? "🏆 Pool play complete! Contact tournament admin to advance."
+                      : "⏳ Pool play in progress. Knockout seeding waits for admin."}
+                  </p>
                 </div>
               )}
             </div>
@@ -591,8 +626,8 @@ export default function PoolPlay({
                               />
                               <Button
                                 onClick={() => {
-                                  setTeam1Score("21")
-                                  setTeam2Score("0")
+                                  setTeam1Score(String(GAME_POINT))
+                                  setTeam2Score(String(BLOWOUT_LOSER))
                                 }}
                                 className="bg-red-600 hover:bg-red-700 text-white font-bold px-4 py-2 text-sm rounded-full min-h-11"
                                 size="sm"
@@ -659,8 +694,8 @@ export default function PoolPlay({
                               />
                               <Button
                                 onClick={() => {
-                                  setTeam2Score("21")
-                                  setTeam1Score("0")
+                                  setTeam2Score(String(GAME_POINT))
+                                  setTeam1Score(String(BLOWOUT_LOSER))
                                 }}
                                 className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2 text-sm rounded-full min-h-11"
                                 size="sm"
@@ -687,23 +722,23 @@ export default function PoolPlay({
                       <div className="grid grid-cols-2 gap-3">
                         <Button
                           onClick={() => {
-                            setTeam1Score("21")
-                            setTeam2Score("19")
+                            setTeam1Score(String(GAME_POINT))
+                            setTeam2Score(String(CLOSE_GAME_LOSER))
                           }}
                           variant="outline"
                           className="h-12 text-sm border-green-300 text-green-700 hover:bg-green-50 font-medium"
                         >
-                          Close Game 21-19
+                          Close Game {GAME_POINT}-{CLOSE_GAME_LOSER}
                         </Button>
                         <Button
                           onClick={() => {
-                            setTeam2Score("21")
-                            setTeam1Score("19")
+                            setTeam2Score(String(GAME_POINT))
+                            setTeam1Score(String(CLOSE_GAME_LOSER))
                           }}
                           variant="outline"
                           className="h-12 text-sm border-green-300 text-green-700 hover:bg-green-50 font-medium"
                         >
-                          Close Game 19-21
+                          Close Game {CLOSE_GAME_LOSER}-{GAME_POINT}
                         </Button>
                       </div>
 
@@ -760,26 +795,26 @@ export default function PoolPlay({
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => setQuickScore(match.id, 21, 0)}
+                                onClick={() => setQuickScore(match.id, GAME_POINT, BLOWOUT_LOSER)}
                                 className="border-green-300 text-green-700 hover:bg-green-50 h-10 px-3 text-xs outdoor-text"
                               >
-                                21-0
+                                {GAME_POINT}-0
                               </Button>
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => setQuickScore(match.id, 0, 21)}
+                                onClick={() => setQuickScore(match.id, BLOWOUT_LOSER, GAME_POINT)}
                                 className="border-green-300 text-green-700 hover:bg-green-50 h-10 px-3 text-xs outdoor-text"
                               >
-                                0-21
+                                0-{GAME_POINT}
                               </Button>
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => setQuickScore(match.id, 21, 19)}
+                                onClick={() => setQuickScore(match.id, GAME_POINT, CLOSE_GAME_LOSER)}
                                 className="border-blue-300 text-blue-700 hover:bg-blue-50 h-10 px-3 text-xs outdoor-text"
                               >
-                                21-19
+                                {GAME_POINT}-{CLOSE_GAME_LOSER}
                               </Button>
                             </div>
                           )}

@@ -33,6 +33,12 @@ export default function Standings({ teams, matches, showTitle = true }: Standing
   const standings = calculateStandings(teams, matches)
   const completedMatches = matches.filter((match) => match.completed).length
   const totalMatches = matches.length
+  const gamesPerTeam =
+    standings.length > 0
+      ? Math.round(
+          standings.reduce((sum, team) => sum + team.gamesPlayed, 0) / standings.length,
+        )
+      : 0
 
   return (
     <div className="space-y-6">
@@ -62,7 +68,7 @@ export default function Standings({ teams, matches, showTitle = true }: Standing
             </div>
             <div>
               <p className="text-sm text-red-700 font-semibold">🎯 Games per Team</p>
-              <p className="text-2xl font-bold text-blue-800">{teams.length - 1}</p>
+              <p className="text-2xl font-bold text-blue-800">{gamesPerTeam}</p>
             </div>
           </div>
         </CardContent>

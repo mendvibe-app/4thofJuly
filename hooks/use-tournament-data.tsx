@@ -56,6 +56,7 @@ export type TournamentDataValue = {
   updateTournamentPhase: (phase: TournamentPhase) => Promise<void>
   setByeTeamId: (teamId: number | null) => Promise<void>
   resetTournament: () => Promise<void>
+  clearKnockoutMatches: () => Promise<void>
   loadTournaments: () => Promise<boolean>
   loadPendingRegistrations: () => Promise<void>
   loadTeams: () => Promise<void>
@@ -159,21 +160,7 @@ function useTournamentDataState(): TournamentDataValue {
       return primary.id
     }
 
-    const { data: newTournament, error: createError } = await supabase
-      .from("tournaments")
-      .insert({
-        name: "4th of July Invitational 2025",
-        date: new Date().toISOString().split("T")[0],
-        status: "active",
-        current_phase: "registration",
-      })
-      .select()
-      .single()
-
-    if (createError) throw createError
-
-    syncPrimaryId(newTournament.id)
-    return newTournament.id
+    throw new Error("NO_TOURNAMENT")
   }, [syncPrimaryId])
 
   const loadTournaments = useCallback(async (): Promise<boolean> => {
@@ -410,12 +397,24 @@ function useTournamentDataState(): TournamentDataValue {
       await refreshScopedData()
       setConnectionStatus("connected")
     } catch (error) {
-      console.error("Failed to load tournament data:", error)
-      setConnectionStatus("error")
+      if (error instanceof Error && error.message === "NO_TOURNAMENT") {
+        syncPrimaryId(null)
+        setTournaments([])
+        setTeams([])
+        setPoolPlayMatches([])
+        setKnockoutMatches([])
+        setPendingRegistrations([])
+        setCurrentPhase("registration")
+        setByeTeam(null)
+        setConnectionStatus("connected")
+      } else {
+        console.error("Failed to load tournament data:", error)
+        setConnectionStatus("error")
+      }
     } finally {
       setLoading(false)
     }
-  }, [ensurePrimaryTournament, refreshScopedData])
+  }, [ensurePrimaryTournament, refreshScopedData, syncPrimaryId])
 
   useEffect(() => {
     loadTournamentData()
@@ -808,6 +807,28 @@ function useTournamentDataState(): TournamentDataValue {
     await refreshScopedData()
   }, [ensurePrimaryTournament, refreshScopedData])
 
+  const clearKnockoutMatches = useCallback(async () => {
+    const tournamentId = primaryTournamentIdRef.current
+    if (!tournamentId) return
+
+    const { error } = await supabase
+      .from("matches")
+      .delete()
+      .eq("tournament_id", tournamentId)
+      .eq("phase", "knockout")
+
+    if (error) throw error
+
+    const { error: byeError } = await supabase
+      .from("tournaments")
+      .update({ bye_team_id: null })
+      .eq("id", tournamentId)
+    if (byeError) throw byeError
+
+    setByeTeam(null)
+    await Promise.all([loadMatches(), loadPrimaryTournamentState()])
+  }, [loadMatches, loadPrimaryTournamentState])
+
   return useMemo(
     () => ({
       tournaments,
@@ -834,6 +855,7 @@ function useTournamentDataState(): TournamentDataValue {
       updateTournamentPhase,
       setByeTeamId,
       resetTournament,
+      clearKnockoutMatches,
       loadTournaments,
       loadPendingRegistrations,
       loadTeams,
@@ -864,6 +886,7 @@ function useTournamentDataState(): TournamentDataValue {
       updateTournamentPhase,
       setByeTeamId,
       resetTournament,
+      clearKnockoutMatches,
       loadTournaments,
       loadPendingRegistrations,
       loadTeams,

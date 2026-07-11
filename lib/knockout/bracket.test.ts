@@ -37,8 +37,8 @@ describe("bracket sizing", () => {
     expect(getRoundName(2, 8)).toBe("Semifinals")
     expect(getRoundName(3, 8)).toBe("Championship")
     expect(getRoundName(1, 16)).toBe("First Round")
-    expect(getTargetScore(1, 8)).toBe(15)
-    expect(getTargetScore(3, 8)).toBe(21)
+    expect(getTargetScore(1, 8)).toBe(11)
+    expect(getTargetScore(3, 8)).toBe(11)
   })
 })
 
