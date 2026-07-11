@@ -20,6 +20,7 @@ Tournament day app for the Harbor Way invitational: registration, pool play, kno
 | Knockout seeding / byes | `lib/knockout/` |
 | Live match helpers | `lib/live/` |
 | Primary tournament pick | `lib/tournaments/` |
+| Scoring constants (11 win-by-2) | `lib/scoring.ts` |
 | Admin session | `hooks/use-admin.tsx` + `ADMIN_SYSTEM.md` |
 
 **Single-active tournament:** the live UI, scores, pending queue, and public signup are scoped to one primary tournament (`status=active`, else latest date). Switch it from Admin → Tournament Management → **Make Active**.
