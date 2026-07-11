@@ -26,7 +26,6 @@ export default function LiveBanner() {
     const checkSpeechSupport = () => {
       if (!('speechSynthesis' in window)) {
         setSpeechSupported(false)
-        console.warn('Speech synthesis not supported in this browser')
       }
     }
     
@@ -147,7 +146,6 @@ export default function LiveBanner() {
   // Text-to-Speech function
   const speakAnnouncement = () => {
     if (!speechSupported || !('speechSynthesis' in window)) {
-      console.warn('Speech synthesis not supported')
       return
     }
     
@@ -155,7 +153,6 @@ export default function LiveBanner() {
     const nextMatch = getNextMatch()
     
     if (!currentMatch && !nextMatch) {
-      console.warn('No matches to announce')
       return
     }
     
@@ -165,11 +162,9 @@ export default function LiveBanner() {
     const announcement = generateAnnouncement(currentMatch, nextMatch)
     
     if (!announcement) {
-      console.warn('No announcement to make')
       return
     }
     
-    console.log('📢 Announcing:', announcement)
     
     const utterance = new SpeechSynthesisUtterance(announcement)
     
@@ -182,12 +177,10 @@ export default function LiveBanner() {
     // Handle speech events
     utterance.onstart = () => {
       setIsSpeaking(true)
-      console.log('🎤 Speech started')
     }
     
     utterance.onend = () => {
       setIsSpeaking(false)
-      console.log('🎤 Speech ended')
     }
     
     utterance.onerror = (event) => {

@@ -217,8 +217,6 @@ export default function KnockoutBracket({ matches, poolPlayMatches, updateMatch,
           const nextRoundMatches = matches.filter((m) => m.phase === "knockout" && m.round === currentRound + 1)
           const expectedNextRoundMatches = Math.floor((currentRoundMatches.length + byeTeams.length) / 2)
           
-          console.log(`🔍 Round ${currentRound} completed: ${currentRoundMatches.length} matches`)
-          console.log(`  📊 Next round matches exist: ${nextRoundMatches.length}, expected: ${expectedNextRoundMatches}`)
           console.log(`  🔒 Round ${currentRound + 1} creation in progress: ${creatingRounds.has(currentRound + 1)}`)
           
           if (nextRoundMatches.length === 0 && !creatingRounds.has(currentRound + 1)) {
@@ -267,7 +265,6 @@ export default function KnockoutBracket({ matches, poolPlayMatches, updateMatch,
               )
               
               if (duplicateMatch) {
-                console.warn(`⚠️ DUPLICATE PREVENTED: Match ${team1.name} vs ${team2.name} already exists in round ${currentRound + 1}`)
                 continue
               }
               
@@ -285,14 +282,12 @@ export default function KnockoutBracket({ matches, poolPlayMatches, updateMatch,
             }
             
             if (nextRoundMatchesToCreate.length > 0) {
-              console.log(`🏆 Creating ${nextRoundMatchesToCreate.length} new matches for round ${currentRound + 1}`)
               
               // Lock this round to prevent duplicates
               setCreatingRounds(prev => new Set([...prev, currentRound + 1]))
               
               try {
                 await createMatches(nextRoundMatchesToCreate)
-                console.log(`✅ Round ${currentRound + 1} matches created successfully`)
               } catch (error) {
                 console.error(`❌ Failed to create round ${currentRound + 1} matches:`, error)
               } finally {
@@ -304,7 +299,6 @@ export default function KnockoutBracket({ matches, poolPlayMatches, updateMatch,
                 })
               }
             } else {
-              console.log(`ℹ️ No new matches to create - all matches already exist`)
             }
           }
         } else if (completedCurrentRound && currentRoundMatches.length === 1) {
@@ -312,49 +306,41 @@ export default function KnockoutBracket({ matches, poolPlayMatches, updateMatch,
           const nextRoundMatches = matches.filter((m) => m.phase === "knockout" && m.round === currentRound + 1)
           const isLastPossibleRound = currentRound === Math.ceil(Math.log2(bracketSize))
           
-          console.log(`🔍 Single match completed in round ${currentRound}:`)
           console.log(`  📊 Bracket size: ${bracketSize}, expected final round: ${Math.ceil(Math.log2(bracketSize))}`)
-          console.log(`  🏆 Is last possible round: ${isLastPossibleRound}`)
-          console.log(`  📋 Next round matches exist: ${nextRoundMatches.length}`)
           
           if (isLastPossibleRound && nextRoundMatches.length === 0) {
             // Tournament complete - set champion
             const finalMatch = currentRoundMatches[0]
             const winner = finalMatch.team1Score > finalMatch.team2Score ? finalMatch.team1 : finalMatch.team2
-            console.log(`🏆 Tournament complete! Champion: ${winner.name}`)
             setChampion(winner)
           } else if (nextRoundMatches.length === 0) {
             // This is just a single match in an early round - advance normally
-            console.log(`🚀 Advancing from single match in round ${currentRound}`)
             
             // Get winner from the single match
             const winner = currentRoundMatches[0].team1Score > currentRoundMatches[0].team2Score ? 
               currentRoundMatches[0].team1 : currentRoundMatches[0].team2
-            console.log(`  🥇 Winner: ${winner.name}`)
             
             const winners = [winner]
             
             // For the first round, add all bye teams
             if (currentRound === 1 && byeTeams.length > 0) {
-              console.log(`  👋 Adding ${byeTeams.length} bye teams to advancement`)
               byeTeams.forEach(team => {
                 console.log(`    #${getSeedNumber(team)} ${team.name} - BYE`)
               })
               winners.unshift(...byeTeams)
             }
             
-            console.log(`  👥 Total advancing teams: ${winners.length}`)
-            console.log(`  📊 Next round matches exist: ${nextRoundMatches.length}`)
             console.log(`  🔒 Round ${currentRound + 1} creation in progress: ${creatingRounds.has(currentRound + 1)}`)
             
             if (winners.length >= 2 && !creatingRounds.has(currentRound + 1)) {
               // Sort by seed number to maintain proper bracket seeding
               winners.sort((a, b) => getSeedNumber(a) - getSeedNumber(b))
               
-              console.log(`  🎯 Creating next round matches:`)
               
               // Create next round matches
-              const nextRoundMatchesToCreate: Omit<Match, "id">[] = []
+              const nextRoundMatchesToCreate: Array<
+                Omit<Match, "id" | "tournamentId" | "tournament"> & { tournamentId?: number }
+              > = []
               for (let i = 0; i < winners.length / 2; i++) {
                 const team1 = winners[i]
                 const team2 = winners[winners.length - 1 - i]
@@ -380,13 +366,11 @@ export default function KnockoutBracket({ matches, poolPlayMatches, updateMatch,
                 )
                 
                 if (duplicateMatch) {
-                  console.warn(`⚠️ DUPLICATE PREVENTED: Match ${team1.name} vs ${team2.name} already exists in round ${currentRound + 1}`)
                   continue
                 }
                 
                 const team1Seed = getSeedNumber(team1)
                 const team2Seed = getSeedNumber(team2)
-                console.log(`    🥊 Match ${i + 1}: #${team1Seed} ${team1.name} vs #${team2Seed} ${team2.name}`)
                 
                 nextRoundMatchesToCreate.push({
                   team1,
@@ -400,14 +384,12 @@ export default function KnockoutBracket({ matches, poolPlayMatches, updateMatch,
               }
               
               if (nextRoundMatchesToCreate.length > 0) {
-                console.log(`🏆 Creating ${nextRoundMatchesToCreate.length} new matches for round ${currentRound + 1}`)
                 
                 // Lock this round to prevent duplicates
                 setCreatingRounds(prev => new Set([...prev, currentRound + 1]))
                 
                 try {
                   await createMatches(nextRoundMatchesToCreate)
-                  console.log(`✅ Round ${currentRound + 1} matches created successfully`)
                 } catch (error) {
                   console.error(`❌ Failed to create round ${currentRound + 1} matches:`, error)
                 } finally {
@@ -419,7 +401,6 @@ export default function KnockoutBracket({ matches, poolPlayMatches, updateMatch,
                   })
                 }
               } else {
-                console.log(`ℹ️ No new matches to create - all matches already exist`)
               }
             }
           }

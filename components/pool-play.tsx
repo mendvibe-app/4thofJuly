@@ -104,7 +104,6 @@ export default function PoolPlay({
         gameCount.set(match.team2.id, team2Games + 1)
       })
       
-      console.log(`🏓 Generating pool play schedule: ${targetGames} games per team`)
       console.log(`📊 Current games per team:`, Object.fromEntries(
         teams.map(t => [t.name, gameCount.get(t.id) || 0])
       ))
@@ -117,21 +116,18 @@ export default function PoolPlay({
       const shuffledTeams = [...teams].sort(() => Math.random() - 0.5)
       
       // Phase 1: Create matches between teams that both need games
-      console.log(`🚀 Phase 1: Creating initial matches between teams needing games`)
       for (let attempts = 0; attempts < 500; attempts++) {
         const teamsNeedingGames = shuffledTeams.filter(team => 
           (tempGameCount.get(team.id) || 0) < targetGames
         )
         
         if (attempts === 0) {
-          console.log(`📊 Phase 1 start: ${teamsNeedingGames.length} teams need games:`)
           teamsNeedingGames.forEach(team => {
             console.log(`  - ${team.name}: ${tempGameCount.get(team.id) || 0}/${targetGames}`)
           })
         }
         
         if (teamsNeedingGames.length === 0) {
-          console.log(`✅ Phase 1 complete: All teams have enough games`)
           break
         }
         
@@ -177,7 +173,6 @@ export default function PoolPlay({
         }
       }
       
-      console.log(`📋 Phase 1 complete: ${allNeededMatches.length} matches created`)
       console.log(`📊 Games after Phase 1:`, Object.fromEntries(
         teams.map(t => [t.name, tempGameCount.get(t.id) || 0])
       ))
@@ -197,20 +192,16 @@ export default function PoolPlay({
         
         if (teamsNeedingGames.length === 0) break
         
-        console.log(`🔄 Phase 2 iteration ${safetyCounter}: ${teamsNeedingGames.length} teams still need games`)
         teamsNeedingGames.forEach(team => {
           const currentGames = tempGameCount.get(team.id) || 0
-          console.log(`    ${team.name}: ${currentGames}/${targetGames} games`)
         })
         
         for (const team of teamsNeedingGames) {
           const currentGames = tempGameCount.get(team.id) || 0
           const gamesNeeded = targetGames - currentGames
           
-          console.log(`🎯 Processing ${team.name}: needs ${gamesNeeded} more games`)
           
           if (gamesNeeded <= 0) {
-            console.log(`  ✅ ${team.name} already has enough games, skipping`)
             continue
           }
           
@@ -233,13 +224,11 @@ export default function PoolPlay({
             return aGames - bGames
           })
           
-          console.log(`  🔍 Found ${potentialOpponents.length} potential opponents for ${team.name}:`)
           potentialOpponents.slice(0, 5).forEach(opp => { // Show first 5
             const oppGames = tempGameCount.get(opp.id) || 0
             console.log(`    - ${opp.name} (${oppGames} games)`)
           })
           if (potentialOpponents.length > 5) {
-            console.log(`    ... and ${potentialOpponents.length - 5} more`)
           }
           
           if (potentialOpponents.length === 0) {
@@ -250,7 +239,6 @@ export default function PoolPlay({
           
           // Add games for this team until they reach the minimum
           const matchesToAdd = Math.min(gamesNeeded, potentialOpponents.length)
-          console.log(`  ➕ Adding ${matchesToAdd} matches for ${team.name}`)
           
           for (let i = 0; i < matchesToAdd; i++) {
             const opponent = potentialOpponents[i]
@@ -266,10 +254,8 @@ export default function PoolPlay({
       }
       
       if (safetyCounter >= 50) {
-        console.warn(`⚠️ Safety limit reached in Phase 2 - some teams may have fewer than ${targetGames} games`)
       }
       
-      console.log(`📋 Generated ${allNeededMatches.length} total matches. Now creating optimal schedule...`)
       
       // Step 2: Create optimal schedule - spread teams out to avoid back-to-back games
       const scheduledMatches: Array<Omit<Match, "id" | "tournamentId" | "tournament"> & { tournamentId?: number }> = []
@@ -278,7 +264,6 @@ export default function PoolPlay({
       
       let round = 1
       while (remainingMatches.length > 0) {
-        console.log(`📅 Scheduling round ${round}...`)
         
         // Find the best match for this round with enhanced anti-back-to-back logic
         let bestMatch: {team1: Team, team2: Team} | null = null
@@ -318,7 +303,6 @@ export default function PoolPlay({
         
         // FALLBACK: If no match was found (shouldn't happen with new scoring), just take the first one
         if (!bestMatch && remainingMatches.length > 0) {
-          console.warn(`⚠️ No optimal match found for round ${round}, selecting first available match`)
           bestMatch = remainingMatches[0]
           bestIndex = 0
           bestScore = 0
@@ -368,7 +352,6 @@ export default function PoolPlay({
         }
       }
       
-      console.log(`🏁 Schedule created! ${scheduledMatches.length} games scheduled.`)
       
       // VALIDATION: Final check to ensure no team exceeds the target game count
       const finalGameCounts = Object.fromEntries(
@@ -379,10 +362,8 @@ export default function PoolPlay({
         })
       )
       
-      console.log(`📊 Final games per team:`, finalGameCounts)
       
       // DETAILED VALIDATION: Check each team's game count
-      console.log(`🔍 VALIDATION: Checking all teams have at least ${targetGames} games...`)
       const teamsBelowMinimum = []
       
       for (const team of teams) {
@@ -390,7 +371,6 @@ export default function PoolPlay({
         const newGames = scheduledMatches.filter(m => m.team1.id === team.id || m.team2.id === team.id).length
         const totalGames = existingGames + newGames
         
-        console.log(`  ${team.name}: ${existingGames} existing + ${newGames} new = ${totalGames} total games`)
         
         if (totalGames < targetGames) {
           teamsBelowMinimum.push({ team, totalGames })
@@ -420,24 +400,19 @@ export default function PoolPlay({
         return acc
       }, {} as Record<number, number>)
       
-      console.log(`✅ Validation passed: All teams have at least ${targetGames} games`)
       console.log(`📊 Game distribution:`, Object.entries(gameDistribution).map(([games, teams]) => 
         `${teams} team${teams === 1 ? '' : 's'} with ${games} game${games === '1' ? '' : 's'}`
       ).join(', '))
       
       // Show schedule preview
-      console.log(`📅 Game Schedule Preview:`)
       scheduledMatches.slice(0, 10).forEach((match, i) => {
-        console.log(`   Game ${i + 1}: ${match.team1.name} vs ${match.team2.name}`)
       })
       if (scheduledMatches.length > 10) {
-        console.log(`   ... and ${scheduledMatches.length - 10} more games`)
       }
       
       if (scheduledMatches.length > 0) {
         await createMatches(scheduledMatches)
       } else {
-        console.log(`ℹ️ No new matches needed - all teams already have sufficient games`)
       }
     } catch (error) {
       console.error("Error generating matches:", error)
@@ -478,12 +453,9 @@ export default function PoolPlay({
       const bracketSize = Math.pow(2, Math.ceil(Math.log2(allTeams.length)))
       const byesNeeded = bracketSize - allTeams.length
       
-      console.log(`🏆 Generating ${bracketSize}-team knockout bracket`)
       console.log(`👥 ${allTeams.length} teams advance (NO eliminations)`)
-      console.log(`👋 ${byesNeeded} byes awarded to top ${byesNeeded} seeds`)
       
       // DETAILED SEEDING DEBUG
-      console.log(`📊 Team Seeding:`)
       allTeams.forEach((team, index) => {
         console.log(`  #${index + 1}: ${team.name} (${team.wins}W-${team.losses}L, +${team.pointsFor - team.pointsAgainst})`)
       })
@@ -504,32 +476,27 @@ export default function PoolPlay({
       
       console.log(`👋 Teams with BYES (${byeTeams.length}):`)
       byeTeams.forEach((team, index) => {
-        console.log(`  #${index + 1}: ${team.name} - BYE`)
       })
       
       console.log(`🥊 Teams PLAYING first round (${playingTeams.length}):`)
       playingTeams.forEach((team, index) => {
         const actualSeed = allTeams.findIndex(t => t.id === team.id) + 1
-        console.log(`  #${actualSeed}: ${team.name}`)
       })
       
       // Set bye teams (for now, just track the #1 seed as primary bye)
       if (byeTeams.length > 0) {
         await setByeTeamId(byeTeams[0].id) // Primary bye team for UI
-        console.log(`✅ Primary bye: #1 ${byeTeams[0].name}`)
         if (byeTeams.length > 1) {
           console.log(`✅ Additional byes: ${byeTeams.slice(1).map(t => `#${allTeams.findIndex(team => team.id === t.id) + 1} ${t.name}`).join(', ')}`)
         }
       } else {
         await setByeTeamId(null)
-        console.log(`ℹ️ No byes needed - perfect bracket size`)
       }
 
       // Create first round matches with proper seeding
       const knockoutMatches: Array<Omit<Match, "id" | "tournamentId" | "tournament"> & { tournamentId?: number }> = []
       const numMatches = Math.floor(playingTeams.length / 2)
 
-      console.log(`🎯 Creating ${numMatches} first round matches from ${playingTeams.length} playing teams:`)
       
       // Create matches with proper tournament seeding (highest vs lowest remaining)
       for (let i = 0; i < numMatches; i++) {
@@ -574,7 +541,6 @@ export default function PoolPlay({
           round: 1,
         })
         
-        console.log(`🥊 Match ${i + 1}: #${team1Seed} ${team1.name} vs #${team2Seed} ${team2.name}`)
       }
 
       // FINAL VALIDATION: Ensure all teams are accounted for
@@ -594,9 +560,6 @@ export default function PoolPlay({
         await createMatches(knockoutMatches)
       }
 
-      console.log(`🎉 Knockout bracket generated successfully!`)
-      console.log(`📊 Bracket: ${bracketSize} teams, ${byesNeeded} byes, ${knockoutMatches.length} first round matches`)
-      console.log(`✅ Validation passed: All ${allTeams.length} teams properly placed`)
       onAdvanceToKnockout()
     } catch (error) {
       console.error("Error generating knockout bracket:", error)
@@ -671,7 +634,6 @@ export default function PoolPlay({
     if (!confirm(`Generate random scores for ${incompleteMatches.length} matches?`)) return
 
     try {
-      console.log(`🎲 Generating random scores for ${incompleteMatches.length} matches...`)
 
       for (let i = 0; i < incompleteMatches.length; i++) {
         const match = incompleteMatches[i]
@@ -707,9 +669,6 @@ export default function PoolPlay({
           completed: true,
         })
 
-        console.log(
-          `✅ Match ${i + 1}/${incompleteMatches.length}: ${match.team1.name} ${team1Score}-${team2Score} ${match.team2.name}`,
-        )
 
         // Small delay to avoid overwhelming the database
         if (i < incompleteMatches.length - 1) {
@@ -717,7 +676,6 @@ export default function PoolPlay({
         }
       }
 
-      console.log("🎉 All random scores generated successfully!")
     } catch (error) {
       console.error("❌ Error generating random scores:", error)
       alert(`Failed to generate random scores: ${error instanceof Error ? error.message : "Unknown error"}`)
@@ -733,7 +691,6 @@ export default function PoolPlay({
     if (!confirm(`Reset all ${matches.length} match scores? This cannot be undone.`)) return
 
     try {
-      console.log(`🔄 Resetting ${matches.length} match scores...`)
 
       for (let i = 0; i < matches.length; i++) {
         const match = matches[i]
@@ -743,7 +700,6 @@ export default function PoolPlay({
           completed: false,
         })
 
-        console.log(`✅ Reset match ${i + 1}/${matches.length}`)
 
         // Small delay to avoid overwhelming the database
         if (i < matches.length - 1) {
@@ -751,7 +707,6 @@ export default function PoolPlay({
         }
       }
 
-      console.log("🎉 All match scores reset successfully!")
     } catch (error) {
       console.error("❌ Error resetting scores:", error)
       alert(`Failed to reset scores: ${error instanceof Error ? error.message : "Unknown error"}`)

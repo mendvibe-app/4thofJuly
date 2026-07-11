@@ -1,36 +1,33 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback } from "react"
 
-// Admin configuration - this can be easily changed during tournament
-const ADMIN_PASSCODE = 'july4admin'
+const ADMIN_PASSCODE = process.env.NEXT_PUBLIC_ADMIN_PASSCODE || "july4admin"
 
 export function useAdmin() {
   const [isAdmin, setIsAdmin] = useState(false)
-  const [adminName, setAdminName] = useState('')
+  const [adminName, setAdminName] = useState("")
 
-  // Load admin state from localStorage on mount
   useEffect(() => {
-    const savedAdminState = localStorage.getItem('tournament-admin-state')
-    if (savedAdminState) {
-      try {
-        const { isAdmin: savedIsAdmin, adminName: savedAdminName, timestamp } = JSON.parse(savedAdminState)
-        
-        // Check if admin session is still valid (expires after 48 hours)
-        const now = Date.now()
-        const fortyEightHoursInMs = 48 * 60 * 60 * 1000
-        
-        if (now - timestamp < fortyEightHoursInMs) {
-          setIsAdmin(savedIsAdmin)
-          setAdminName(savedAdminName)
-          console.log(`🔐 Admin session restored for: ${savedAdminName}`)
-        } else {
-          // Session expired, clear it
-          localStorage.removeItem('tournament-admin-state')
-          console.log('🔐 Admin session expired, cleared.')
-        }
-      } catch (error) {
-        console.error('Error loading admin state:', error)
-        localStorage.removeItem('tournament-admin-state')
+    const savedAdminState = localStorage.getItem("tournament-admin-state")
+    if (!savedAdminState) return
+
+    try {
+      const {
+        isAdmin: savedIsAdmin,
+        adminName: savedAdminName,
+        timestamp,
+      } = JSON.parse(savedAdminState)
+
+      const now = Date.now()
+      const fortyEightHoursInMs = 48 * 60 * 60 * 1000
+
+      if (now - timestamp < fortyEightHoursInMs) {
+        setIsAdmin(savedIsAdmin)
+        setAdminName(savedAdminName)
+      } else {
+        localStorage.removeItem("tournament-admin-state")
       }
+    } catch {
+      localStorage.removeItem("tournament-admin-state")
     }
   }, [])
 
@@ -38,39 +35,37 @@ export function useAdmin() {
     return passcode.toLowerCase().trim() === ADMIN_PASSCODE.toLowerCase()
   }, [])
 
-  const loginAsAdmin = useCallback((passcode: string, name: string) => {
-    if (isValidPasscode(passcode)) {
+  const loginAsAdmin = useCallback(
+    (passcode: string, name: string) => {
+      if (!isValidPasscode(passcode)) return false
+
       setIsAdmin(true)
       setAdminName(name.trim())
-      
-      // Save admin state to localStorage
-      const adminState = {
-        isAdmin: true,
-        adminName: name.trim(),
-        timestamp: Date.now()
-      }
-      localStorage.setItem('tournament-admin-state', JSON.stringify(adminState))
-      
-      console.log(`🔐 Admin login successful: ${name}`)
+
+      localStorage.setItem(
+        "tournament-admin-state",
+        JSON.stringify({
+          isAdmin: true,
+          adminName: name.trim(),
+          timestamp: Date.now(),
+        }),
+      )
+
       return true
-    }
-    return false
-  }, [isValidPasscode])
+    },
+    [isValidPasscode],
+  )
 
   const logoutAdmin = useCallback(() => {
     setIsAdmin(false)
-    setAdminName('')
-    localStorage.removeItem('tournament-admin-state')
-    console.log('🔐 Admin logout successful')
+    setAdminName("")
+    localStorage.removeItem("tournament-admin-state")
   }, [])
 
   const kickAllAdmins = useCallback(() => {
-    // This would typically clear all admin sessions
-    // For now, we'll just clear the current session
     setIsAdmin(false)
-    setAdminName('')
-    localStorage.removeItem('tournament-admin-state')
-    console.log('🔐 All admin sessions cleared')
+    setAdminName("")
+    localStorage.removeItem("tournament-admin-state")
   }, [])
 
   return {
@@ -79,6 +74,6 @@ export function useAdmin() {
     loginAsAdmin,
     logoutAdmin,
     kickAllAdmins,
-    isValidPasscode
+    isValidPasscode,
   }
-} 
+}

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
+import { Providers } from '@/components/providers'
 import './globals.css'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -89,9 +90,11 @@ export default function RootLayout({
       <body className={`${inter.className} h-full antialiased`}>
         {/* Mobile-first app shell */}
         <div className="min-h-full bg-slate-900">
-          <main className="pb-20 safe-area-inset-bottom">
-            {children}
-          </main>
+          <Providers>
+            <main className="pb-20 safe-area-inset-bottom">
+              {children}
+            </main>
+          </Providers>
         </div>
       </body>
     </html>

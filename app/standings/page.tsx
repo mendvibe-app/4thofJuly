@@ -8,7 +8,7 @@ import { useTournamentData } from "@/hooks/use-tournament-data"
 
 export default function StandingsPage() {
   const router = useRouter()
-  const { teams, poolPlayMatches, loading, connectionStatus, currentPhase, updateTournamentPhase } = useTournamentData()
+  const { teams, poolPlayMatches, loading, connectionStatus, currentPhase } = useTournamentData()
 
   const navigationItems = [
     { id: "registration", label: "Teams", icon: Users, badge: teams.length },
@@ -101,16 +101,13 @@ export default function StandingsPage() {
               <button
                 key={item.id}
                 onClick={() => {
-                  if (item.id === "standings") {
-                    // Already on standings page
-                    return
-                  }
+                  if (item.id === "standings") return
                   if (item.id === "rules") {
                     router.push("/rules")
                     return
                   }
+                  // Navigate home without mutating tournament phase
                   router.push("/")
-                  setTimeout(() => updateTournamentPhase(item.id as any), 100)
                 }}
                 className={`
                   bottom-nav-item relative

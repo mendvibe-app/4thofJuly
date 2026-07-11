@@ -13,7 +13,7 @@ import { useAdmin } from "@/hooks/use-admin"
 
 interface TeamRegistrationProps {
   teams: Team[]
-  addTeam: (team: Omit<Team, "id">) => Promise<void>
+  addTeam: (team: Omit<Team, "id" | "tournamentId"> & { tournamentId?: number }) => Promise<void>
   updateTeam: (teamId: number, updates: Partial<Team>) => Promise<void>
   deleteTeam: (teamId: number) => Promise<void>
   onStartTournament: () => Promise<void>
@@ -42,14 +42,12 @@ export default function TeamRegistration({
     })
     
     if (!teamName.trim() || !player1.trim() || !player2.trim() || isSubmitting) {
-      console.log("❌ VALIDATION FAILED - missing fields or already submitting")
       return
     }
 
-    console.log("✅ VALIDATION PASSED - attempting to add team")
     setIsSubmitting(true)
     try {
-      const newTeam: Omit<Team, "id"> = {
+      const newTeam: Omit<Team, "id" | "tournamentId"> & { tournamentId?: number } = {
         name: teamName.trim(),
         players: [player1.trim(), player2.trim()],
         paid: false,
@@ -59,9 +57,7 @@ export default function TeamRegistration({
         pointsAgainst: 0,
       }
 
-      console.log("🚀 CALLING addTeam with:", newTeam)
       await addTeam(newTeam)
-      console.log("✅ ADD TEAM SUCCESS!")
       resetForm()
     } catch (error) {
       console.error("❌ ADD TEAM ERROR:", error)
@@ -90,18 +86,13 @@ export default function TeamRegistration({
   }
 
   const handleDeleteTeam = async (teamId: number) => {
-    console.log("🎯 DELETE TEAM DEBUG:", { teamId })
     
     if (!confirm("Are you sure you want to delete this team?")) {
-      console.log("❌ DELETE CANCELLED by user")
       return
     }
 
-    console.log("✅ DELETE CONFIRMED - attempting to delete team")
     try {
-      console.log("🚀 CALLING deleteTeam with ID:", teamId)
       await deleteTeam(teamId)
-      console.log("✅ DELETE TEAM SUCCESS!")
     } catch (error) {
       console.error("❌ DELETE TEAM ERROR:", error)
       alert("Failed to delete team. Please try again.")
@@ -196,26 +187,22 @@ export default function TeamRegistration({
 
     setIsSubmitting(true)
     try {
-      console.log("🔄 Generating random teams...")
 
       // Clear existing teams first (only if there are any)
       if (teams.length > 0) {
-        console.log(`🗑️ Clearing ${teams.length} existing teams...`)
         const deletePromises = teams.map((team) => deleteTeam(team.id))
         await Promise.all(deletePromises)
-        console.log("✅ Cleared existing teams")
 
         // Wait a moment for the database to update
         await new Promise((resolve) => setTimeout(resolve, 500))
       }
 
       // Add new random teams
-      console.log(`➕ Adding ${numTeams} new teams...`)
       const shuffledTeamNames = [...teamNames].sort(() => Math.random() - 0.5)
       const shuffledPlayerNames = [...playerNames].sort(() => Math.random() - 0.5)
 
       for (let i = 0; i < numTeams; i++) {
-        const newTeam: Omit<Team, "id"> = {
+        const newTeam: Omit<Team, "id" | "tournamentId"> & { tournamentId?: number } = {
           name:
             shuffledTeamNames[i % shuffledTeamNames.length] +
             (i >= shuffledTeamNames.length ? ` ${Math.floor(i / shuffledTeamNames.length) + 1}` : ""),
@@ -231,10 +218,8 @@ export default function TeamRegistration({
         }
 
         await addTeam(newTeam)
-        console.log(`✅ Added team ${i + 1}/${numTeams}: ${newTeam.name}`)
       }
 
-      console.log(`🎉 Successfully generated ${numTeams} random teams`)
     } catch (error) {
       console.error("❌ Error generating random teams:", error)
       alert(`Failed to generate random teams: ${error instanceof Error ? error.message : "Unknown error"}`)
