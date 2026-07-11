@@ -22,9 +22,11 @@ export default function AdminPage() {
   const { isAdmin, adminName: currentAdminName, loginAsAdmin, logoutAdmin, passcodeConfigured } = useAdmin()
   const { 
     tournaments, 
-    pendingRegistrations, 
+    pendingRegistrations,
+    teams,
     loadTournaments, 
-    loadPendingRegistrations 
+    loadPendingRegistrations,
+    loadTeams,
   } = useTournamentData()
 
   const handleAdminLogin = (e: React.FormEvent) => {
@@ -59,7 +61,7 @@ export default function AdminPage() {
   }
 
   const handleDataUpdated = async () => {
-    await Promise.all([loadTournaments(), loadPendingRegistrations()])
+    await Promise.all([loadTournaments(), loadPendingRegistrations(), loadTeams()])
   }
 
   const pendingCount = pendingRegistrations.filter(r => r.status === 'pending').length
@@ -169,6 +171,7 @@ export default function AdminPage() {
                 <AdminPendingRegistrations
                   pendingRegistrations={pendingRegistrations}
                   tournaments={tournaments}
+                  teams={teams}
                   onRegistrationUpdated={handleDataUpdated}
                 />
               </TabsContent>
