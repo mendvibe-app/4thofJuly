@@ -50,16 +50,17 @@ cp .env.example .env.local
 # fill NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY
 # optional locally: NEXT_PUBLIC_ADMIN_PASSCODE
 
-npm install --legacy-peer-deps
+npm install
 npm run dev
 ```
 
 Tests: `npm test` · Production build: `npm run build`
 
-Database: run `scripts/create-tables.sql` (and realtime scripts if needed) in the Supabase SQL editor. Details in `SETUP_GUIDE.md`.
+Database: run `scripts/create-tables.sql` (and realtime scripts if needed) in the Supabase SQL editor. Details in `SETUP_GUIDE.md`. Day-of: `TOURNAMENT_DAY.md`.
 
 ## Docs map
 
+- `TOURNAMENT_DAY.md` — merge order, smoke test, roles
 - `SETUP_GUIDE.md` — local env + DB
 - `DEPLOYMENT_GUIDE.md` — Vercel + production checklist
 - `ADMIN_SYSTEM.md` — passcode, gates, trust model, single-active
@@ -67,4 +68,4 @@ Database: run `scripts/create-tables.sql` (and realtime scripts if needed) in th
 
 ## Cleanup history
 
-Stacked hardening PRs: foundation/data → admin/security → registration → pool → knockout → live UX → multi-tournament → docs/polish.
+Stacked hardening PRs: foundation/data → admin/security → registration → pool → knockout → live UX → multi-tournament → docs/polish → tournament-day → ops (API/RLS foundation).

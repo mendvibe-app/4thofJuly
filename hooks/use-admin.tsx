@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react"
 import { fingerprintPasscode } from "@/lib/admin/passcode"
+import { adminApiEnabledOnClient, adminApiLogin, adminApiLogout } from "@/lib/admin/api-client"
 
 const ADMIN_STORAGE_KEY = "tournament-admin-state"
 const ENV_PASSCODE = process.env.NEXT_PUBLIC_ADMIN_PASSCODE
@@ -146,6 +147,11 @@ export function AdminProvider({ children }: { children: ReactNode }) {
         passcodeFingerprint: fingerprintPasscode(expected),
       }
       localStorage.setItem(ADMIN_STORAGE_KEY, JSON.stringify(payload))
+
+      if (adminApiEnabledOnClient()) {
+        void adminApiLogin(passcode, trimmed)
+      }
+
       return true
     },
     [isValidPasscode],
@@ -155,6 +161,9 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     setIsAdmin(false)
     setAdminName("")
     clearStoredAdminState()
+    if (adminApiEnabledOnClient()) {
+      void adminApiLogout()
+    }
   }, [])
 
   const value = useMemo(

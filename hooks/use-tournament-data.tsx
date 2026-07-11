@@ -19,6 +19,11 @@ import type {
 } from "@/types/tournament"
 import { supabase } from "@/lib/supabase"
 import { pickPrimaryTournament } from "@/lib/tournaments"
+import {
+  adminApiEnabledOnClient,
+  adminCreateMatches,
+  adminUpdateMatch,
+} from "@/lib/admin/api-client"
 import type { RealtimeChannel } from "@supabase/supabase-js"
 
 const POLL_INTERVAL_MS = 30_000
@@ -707,6 +712,16 @@ function useTournamentDataState(): TournamentDataValue {
 
   const updateMatch = useCallback(
     async (matchId: number, updates: Partial<Match>) => {
+      if (adminApiEnabledOnClient()) {
+        await adminUpdateMatch(matchId, {
+          team1Score: updates.team1Score,
+          team2Score: updates.team2Score,
+          completed: updates.completed,
+        })
+        await loadMatches()
+        return
+      }
+
       const payload: Record<string, unknown> = {}
       if (updates.tournamentId !== undefined) payload.tournament_id = updates.tournamentId
       if (updates.team1Score !== undefined) payload.team1_score = updates.team1Score
@@ -727,6 +742,29 @@ function useTournamentDataState(): TournamentDataValue {
       >,
     ) => {
       const tournamentId = await ensurePrimaryTournament()
+
+      if (adminApiEnabledOnClient()) {
+        try {
+          await adminCreateMatches(
+            matches.map((match) => ({
+              tournamentId: match.tournamentId || tournamentId,
+              team1Id: match.team1.id,
+              team2Id: match.team2.id,
+              team1Score: match.team1Score || 0,
+              team2Score: match.team2Score || 0,
+              completed: match.completed || false,
+              phase: match.phase,
+              round: match.round || null,
+            })),
+          )
+        } catch (error) {
+          const message = error instanceof Error ? error.message : ""
+          if (!/duplicate|unique/i.test(message)) throw error
+        }
+        await loadMatches()
+        return
+      }
+
       const matchInserts = matches.map((match) => ({
         tournament_id: match.tournamentId || tournamentId,
         team1_id: match.team1.id,
@@ -739,7 +777,22 @@ function useTournamentDataState(): TournamentDataValue {
       }))
 
       const { error } = await supabase.from("matches").insert(matchInserts).select()
-      if (error) throw error
+
+      // Unique index / race: another admin already inserted this knockout pairing
+      if (error) {
+        const code = (error as { code?: string }).code
+        const message = error.message || ""
+        const isDuplicate =
+          code === "23505" ||
+          /duplicate|unique/i.test(message)
+
+        if (isDuplicate) {
+          await loadMatches()
+          return
+        }
+        throw error
+      }
+
       await loadMatches()
     },
     [ensurePrimaryTournament, loadMatches],

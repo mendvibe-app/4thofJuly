@@ -29,10 +29,12 @@ import type { PendingRegistration, Team, Tournament } from "@/types/tournament"
 import { supabase } from "@/lib/supabase"
 import { useAdmin } from "@/hooks/use-admin"
 import {
-  MAX_TEAMS,
-  findDuplicateTeamName,
   formatSupabaseError,
 } from "@/lib/registration"
+import {
+  canApproveRegistration,
+  teamInsertFromRegistration,
+} from "@/lib/registration/approve"
 
 interface AdminPendingRegistrationsProps {
   pendingRegistrations: PendingRegistration[]
@@ -87,18 +89,18 @@ export default function AdminPendingRegistrations({
 
     try {
       const tournamentTeams = teams.filter((t) => t.tournamentId === registration.tournamentId)
-      if (tournamentTeams.length >= MAX_TEAMS) {
-        throw new Error(
-          `Cannot approve — tournament already has ${MAX_TEAMS} teams (maximum).`,
-        )
-      }
-
-      const duplicate = findDuplicateTeamName(
-        registration.teamName,
+      const gate = canApproveRegistration(
+        {
+          id: registration.id,
+          tournamentId: registration.tournamentId,
+          teamName: registration.teamName,
+          status: registration.status,
+        },
         tournamentTeams.map((t) => t.name),
+        tournamentTeams.length,
       )
-      if (duplicate) {
-        throw new Error(`${duplicate}. Reject this registration or rename/remove the existing team.`)
+      if (!gate.ok) {
+        throw new Error(gate.error)
       }
 
       // Claim the pending row atomically so two admins can't both approve it
@@ -120,16 +122,9 @@ export default function AdminPendingRegistrations({
         throw new Error("This registration was already reviewed by someone else.")
       }
 
-      const { error: teamError } = await supabase.from("teams").insert({
-        tournament_id: registration.tournamentId,
-        name: registration.teamName,
-        players: registration.players,
-        paid: false,
-        wins: 0,
-        losses: 0,
-        points_for: 0,
-        points_against: 0,
-      })
+      const { error: teamError } = await supabase
+        .from("teams")
+        .insert(teamInsertFromRegistration(registration))
 
       if (teamError) {
         await revertToPending(registration.id)

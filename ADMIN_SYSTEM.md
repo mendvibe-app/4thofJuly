@@ -87,12 +87,24 @@ From **Admin → Tournament Management**, use **Make Active** to switch. Activat
 
 ## Future hardening (optional)
 
-- Supabase Auth or Next.js API routes with service-role writes
-- Tighter RLS (public SELECT + authenticated INSERT/UPDATE)
+### Server admin API (scaffolded)
+
+When ready to leave open anon writes behind:
+
+1. Set on Vercel: `ADMIN_API_ENABLED=true`, `NEXT_PUBLIC_ADMIN_API_ENABLED=true`, `SUPABASE_SERVICE_ROLE_KEY`, preferred `ADMIN_PASSCODE` + `ADMIN_SESSION_SECRET`
+2. Redeploy — login establishes an httpOnly admin cookie; match create/score updates go through `/api/admin/*`
+3. Run `scripts/tighten-rls.sql` (keeps public SELECT + pending registration INSERT)
+4. Smoke-test scores and knockout advance
+
+Until that flag is on, the browser anon client remains the write path (current tournament-day default).
+
+### Other
+
+- Expand API coverage beyond matches (teams, tournaments, approvals)
+- Supabase Auth or role separation (scorekeeper vs organizer)
 - Audit log of score changes
-- Role separation (scorekeeper vs organizer)
 - Time-limited one-time admin codes
 
 ---
 
-**Ready for tournament day** when the passcode is set in production and scorekeepers are briefed.
+**Ready for tournament day** when the passcode is set in production and scorekeepers are briefed. See `TOURNAMENT_DAY.md`.

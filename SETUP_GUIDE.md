@@ -43,7 +43,7 @@ Tables used by the app:
 ## 3. Install & run
 
 ```bash
-npm install --legacy-peer-deps
+npm install
 npm run dev
 ```
 
@@ -52,6 +52,8 @@ npm run dev
 - Register: http://localhost:3000/register
 
 Connection badge in the UI: **LIVE** (realtime), **POLLING** (30s fallback), or **OFFLINE**.
+
+Day-of checklist: `TOURNAMENT_DAY.md`.
 
 ## 4. Smoke test
 
