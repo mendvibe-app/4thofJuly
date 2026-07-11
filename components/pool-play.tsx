@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Trophy, Users, Target, TrendingUp, Settings, Zap, Shuffle, RotateCcw } from "lucide-react"
 import type { Team, Match } from "@/types/tournament"
 import { useAdmin } from "@/hooks/use-admin"
+import { calculateStandings, generatePoolPlaySchedule } from "@/lib/pool-play"
 
 interface PoolPlayProps {
   teams: Team[]
@@ -38,52 +39,7 @@ export default function PoolPlay({
   const [team2Score, setTeam2Score] = useState("")
 
   // Calculate team standings
-  const calculateStandings = () => {
-    const standings = teams.map((team) => {
-      const teamMatches = matches.filter((match) => match.team1.id === team.id || match.team2.id === team.id)
-      const completedMatches = teamMatches.filter((match) => match.completed)
-
-      let wins = 0
-      let losses = 0
-      let pointsFor = 0
-      let pointsAgainst = 0
-
-      completedMatches.forEach((match) => {
-        if (match.team1.id === team.id) {
-          pointsFor += match.team1Score
-          pointsAgainst += match.team2Score
-          if (match.team1Score > match.team2Score) wins++
-          else losses++
-        } else {
-          pointsFor += match.team2Score
-          pointsAgainst += match.team1Score
-          if (match.team2Score > match.team1Score) wins++
-          else losses++
-        }
-      })
-
-      const pointDifferential = pointsFor - pointsAgainst
-      const winPercentage = completedMatches.length > 0 ? wins / completedMatches.length : 0
-
-      return {
-        ...team,
-        wins,
-        losses,
-        pointsFor,
-        pointsAgainst,
-        pointDifferential,
-        winPercentage,
-        gamesPlayed: completedMatches.length,
-      }
-    })
-
-    // Sort by win percentage, then point differential, then points for
-    return standings.sort((a, b) => {
-      if (b.winPercentage !== a.winPercentage) return b.winPercentage - a.winPercentage
-      if (b.pointDifferential !== a.pointDifferential) return b.pointDifferential - a.pointDifferential
-      return b.pointsFor - a.pointsFor
-    })
-  }
+  // (pure logic lives in lib/pool-play)
 
   const generateMatches = async () => {
     if (!requireAdmin("generate pool play matches")) return
@@ -91,329 +47,19 @@ export default function PoolPlay({
 
     setIsGenerating(true)
     try {
-      const targetGames = Math.min(gamesPerTeam, teams.length - 1)
-      
-      // Track games per team to ensure exactly targetGames for each team
-      const gameCount = new Map<number, number>()
-      teams.forEach(team => gameCount.set(team.id, 0))
-      
-      // Count existing matches for each team
-      matches.forEach(match => {
-        const team1Games = gameCount.get(match.team1.id) || 0
-        const team2Games = gameCount.get(match.team2.id) || 0
-        gameCount.set(match.team1.id, team1Games + 1)
-        gameCount.set(match.team2.id, team2Games + 1)
+      const result = generatePoolPlaySchedule(teams, matches, {
+        gamesPerTeam,
       })
-      
-      console.log(`📊 Current games per team:`, Object.fromEntries(
-        teams.map(t => [t.name, gameCount.get(t.id) || 0])
-      ))
-      
-      // Step 1: Generate all needed matches (without considering schedule order yet)
-      const allNeededMatches: {team1: Team, team2: Team}[] = []
-      const tempGameCount = new Map(gameCount)
-      
-      // Create a shuffled list of teams for variety
-      const shuffledTeams = [...teams].sort(() => Math.random() - 0.5)
-      
-      // Phase 1: Create matches between teams that both need games
-      for (let attempts = 0; attempts < 500; attempts++) {
-        const teamsNeedingGames = shuffledTeams.filter(team => 
-          (tempGameCount.get(team.id) || 0) < targetGames
-        )
-        
-        if (attempts === 0) {
-          teamsNeedingGames.forEach(team => {
-            console.log(`  - ${team.name}: ${tempGameCount.get(team.id) || 0}/${targetGames}`)
-          })
-        }
-        
-        if (teamsNeedingGames.length === 0) {
-          break
-        }
-        
-        let matchCreated = false
-        for (let i = 0; i < teamsNeedingGames.length - 1; i++) {
-          const team1 = teamsNeedingGames[i]
-          for (let j = i + 1; j < teamsNeedingGames.length; j++) {
-            const team2 = teamsNeedingGames[j]
-            
-            // SAFEGUARD: Check if either team would exceed their limit
-            const team1Games = tempGameCount.get(team1.id) || 0
-            const team2Games = tempGameCount.get(team2.id) || 0
-            if (team1Games >= targetGames || team2Games >= targetGames) {
-              if (attempts < 5) console.log(`  ⏭️ Skipping ${team1.name} vs ${team2.name} - at limit (${team1Games}, ${team2Games})`)
-              continue
-            }
-            
-            // Check if these teams have already played
-            const alreadyPlayed = matches.some(match => 
-              (match.team1.id === team1.id && match.team2.id === team2.id) ||
-              (match.team1.id === team2.id && match.team2.id === team1.id)
-            ) || allNeededMatches.some(match => 
-              (match.team1.id === team1.id && match.team2.id === team2.id) ||
-              (match.team1.id === team2.id && match.team2.id === team1.id)
-            )
-            
-            if (!alreadyPlayed) {
-              allNeededMatches.push({team1, team2})
-              tempGameCount.set(team1.id, (tempGameCount.get(team1.id) || 0) + 1)
-              tempGameCount.set(team2.id, (tempGameCount.get(team2.id) || 0) + 1)
-              if (attempts < 10) console.log(`  ➕ Phase 1: ${team1.name} vs ${team2.name} (${tempGameCount.get(team1.id)}, ${tempGameCount.get(team2.id)})`)
-              matchCreated = true
-              break
-            } else {
-              if (attempts < 5) console.log(`  ⏭️ Skipping ${team1.name} vs ${team2.name} - already played`)
-            }
-          }
-          if (matchCreated) break
-        }
-        if (!matchCreated) {
-          console.log(`🛑 Phase 1 ended: No more matches can be created (attempt ${attempts + 1})`)
-          break
-        }
-      }
-      
-      console.log(`📊 Games after Phase 1:`, Object.fromEntries(
-        teams.map(t => [t.name, tempGameCount.get(t.id) || 0])
-      ))
-      
-      // Phase 2: Ensure ALL teams get AT LEAST the target number of games
-      let additionalMatchesNeeded = true
-      let safetyCounter = 0
-      
-      while (additionalMatchesNeeded && safetyCounter < 50) {
-        safetyCounter++
-        additionalMatchesNeeded = false
-        
-        // Find teams that still need more games to reach the minimum
-        const teamsNeedingGames = teams.filter(team => 
-          (tempGameCount.get(team.id) || 0) < targetGames
-        ).sort(() => Math.random() - 0.5) // Randomize order for fairness
-        
-        if (teamsNeedingGames.length === 0) break
-        
-        teamsNeedingGames.forEach(team => {
-          const currentGames = tempGameCount.get(team.id) || 0
-        })
-        
-        for (const team of teamsNeedingGames) {
-          const currentGames = tempGameCount.get(team.id) || 0
-          const gamesNeeded = targetGames - currentGames
-          
-          
-          if (gamesNeeded <= 0) {
-            continue
-          }
-          
-          // Find ALL available opponents (not just those under the limit)
-          const potentialOpponents = teams.filter(opponent => {
-            if (opponent.id === team.id) return false
-            
-            const alreadyPlayed = matches.some(match => 
-              (match.team1.id === team.id && match.team2.id === opponent.id) ||
-              (match.team1.id === opponent.id && match.team2.id === team.id)
-            ) || allNeededMatches.some(match => 
-              (match.team1.id === team.id && match.team2.id === opponent.id) ||
-              (match.team1.id === opponent.id && match.team2.id === team.id)
-            )
-            return !alreadyPlayed
-          }).sort((a, b) => {
-            // Prioritize opponents with fewer games to balance distribution
-            const aGames = tempGameCount.get(a.id) || 0
-            const bGames = tempGameCount.get(b.id) || 0
-            return aGames - bGames
-          })
-          
-          potentialOpponents.slice(0, 5).forEach(opp => { // Show first 5
-            const oppGames = tempGameCount.get(opp.id) || 0
-            console.log(`    - ${opp.name} (${oppGames} games)`)
-          })
-          if (potentialOpponents.length > 5) {
-          }
-          
-          if (potentialOpponents.length === 0) {
-            console.warn(`⚠️ No available opponents for ${team.name} (${currentGames}/${targetGames} games)`)
-            console.warn(`     All teams already played against: ${teams.filter(t => t.id !== team.id).map(t => t.name).join(', ')}`)
-            continue
-          }
-          
-          // Add games for this team until they reach the minimum
-          const matchesToAdd = Math.min(gamesNeeded, potentialOpponents.length)
-          
-          for (let i = 0; i < matchesToAdd; i++) {
-            const opponent = potentialOpponents[i]
-            
-            allNeededMatches.push({team1: team, team2: opponent})
-            tempGameCount.set(team.id, (tempGameCount.get(team.id) || 0) + 1)
-            tempGameCount.set(opponent.id, (tempGameCount.get(opponent.id) || 0) + 1)
-            
-            console.log(`    ✅ ${team.name} vs ${opponent.name} (${team.name}: ${tempGameCount.get(team.id)}, ${opponent.name}: ${tempGameCount.get(opponent.id)})`)
-            additionalMatchesNeeded = true
-          }
-        }
-      }
-      
-      if (safetyCounter >= 50) {
-      }
-      
-      
-      // Step 2: Create optimal schedule - spread teams out to avoid back-to-back games
-      const scheduledMatches: Array<Omit<Match, "id" | "tournamentId" | "tournament"> & { tournamentId?: number }> = []
-      const remainingMatches = [...allNeededMatches]
-      const teamLastPlayedRound = new Map<number, number>() // Track when each team last played
-      
-      let round = 1
-      while (remainingMatches.length > 0) {
-        
-        // Find the best match for this round with enhanced anti-back-to-back logic
-        let bestMatch: {team1: Team, team2: Team} | null = null
-        let bestScore = Number.NEGATIVE_INFINITY // Start with very low score to accept any match
-        let bestIndex = -1
-        
-        for (let i = 0; i < remainingMatches.length; i++) {
-          const match = remainingMatches[i]
-          const team1LastRound = teamLastPlayedRound.get(match.team1.id) || 0
-          const team2LastRound = teamLastPlayedRound.get(match.team2.id) || 0
-          
-          // Calculate rest periods (how many rounds since last played)
-          const team1Rest = round - team1LastRound
-          const team2Rest = round - team2LastRound
-          
-          // Base score: favor teams that haven't played recently
-          let matchScore = team1Rest + team2Rest
-          
-          // MODERATE SCORING: Penalize back-to-back games but not so severely that no matches are viable
-          if (team1LastRound === round - 1) matchScore -= 10 // Reduced penalty from 100 to 10
-          if (team2LastRound === round - 1) matchScore -= 10 // Reduced penalty from 100 to 10
-          
-          // Bonus for teams that haven't played in 2+ rounds
-          if (team1Rest >= 2) matchScore += 5
-          if (team2Rest >= 2) matchScore += 5
-          
-          // Extra bonus for teams that haven't played in 3+ rounds
-          if (team1Rest >= 3) matchScore += 10
-          if (team2Rest >= 3) matchScore += 10
-          
-          if (matchScore > bestScore) {
-            bestScore = matchScore
-            bestMatch = match
-            bestIndex = i
-          }
-        }
-        
-        // FALLBACK: If no match was found (shouldn't happen with new scoring), just take the first one
-        if (!bestMatch && remainingMatches.length > 0) {
-          bestMatch = remainingMatches[0]
-          bestIndex = 0
-          bestScore = 0
-        }
-        
-        if (bestMatch) {
-          const team1LastRound = teamLastPlayedRound.get(bestMatch.team1.id) || 0
-          const team2LastRound = teamLastPlayedRound.get(bestMatch.team2.id) || 0
-          const team1Rest = round - team1LastRound
-          const team2Rest = round - team2LastRound
-          
-          // Schedule this match
-          scheduledMatches.push({
-            team1: bestMatch.team1,
-            team2: bestMatch.team2,
-            team1Score: 0,
-            team2Score: 0,
-            completed: false,
-            phase: "pool-play",
-            round: undefined,
-          })
-          
-          // Update when these teams last played
-          teamLastPlayedRound.set(bestMatch.team1.id, round)
-          teamLastPlayedRound.set(bestMatch.team2.id, round)
-          
-          // Remove this match from remaining matches
-          remainingMatches.splice(bestIndex, 1)
-          
-          // Enhanced logging with rest period info
-          const restInfo = `${bestMatch.team1.name}(+${team1Rest}) vs ${bestMatch.team2.name}(+${team2Rest})`
-          console.log(`   Game ${round}: ${restInfo} (score: ${bestScore})`)
-          
-          // Warning for back-to-back games
-          if (team1Rest === 1) console.warn(`   ⚠️ ${bestMatch.team1.name} playing back-to-back!`)
-          if (team2Rest === 1) console.warn(`   ⚠️ ${bestMatch.team2.name} playing back-to-back!`)
-          
-          round++
-        } else {
-          // This should never happen now with the fallback
-          console.error("❌ Could not find a valid match to schedule - this should not happen!")
-          console.error(`   Remaining matches: ${remainingMatches.length}`)
-          remainingMatches.forEach((match, i) => {
-            console.error(`     ${i}: ${match.team1.name} vs ${match.team2.name}`)
-          })
-          break
-        }
-      }
-      
-      
-      // VALIDATION: Final check to ensure no team exceeds the target game count
-      const finalGameCounts = Object.fromEntries(
-        teams.map(t => {
-          const count = scheduledMatches.filter(m => m.team1.id === t.id || m.team2.id === t.id).length + 
-                       matches.filter(m => m.team1.id === t.id || m.team2.id === t.id).length
-          return [t.name, count]
-        })
-      )
-      
-      
-      // DETAILED VALIDATION: Check each team's game count
-      const teamsBelowMinimum = []
-      
-      for (const team of teams) {
-        const existingGames = matches.filter(m => m.team1.id === team.id || m.team2.id === team.id).length
-        const newGames = scheduledMatches.filter(m => m.team1.id === team.id || m.team2.id === team.id).length
-        const totalGames = existingGames + newGames
-        
-        
-        if (totalGames < targetGames) {
-          teamsBelowMinimum.push({ team, totalGames })
-        }
-      }
-      
-      if (teamsBelowMinimum.length > 0) {
-        console.error(`❌ ALGORITHM FAILED: ${teamsBelowMinimum.length} teams below minimum:`)
-        teamsBelowMinimum.forEach(({ team, totalGames }) => {
-          console.error(`  - ${team.name}: ${totalGames}/${targetGames} games`)
-        })
-        
-        // Show what matches were generated
-        console.error(`📋 Generated matches (${scheduledMatches.length}):`)
-        scheduledMatches.forEach((match, i) => {
-          console.error(`  ${i + 1}: ${match.team1.name} vs ${match.team2.name}`)
-        })
-        
-        alert(`Error: Algorithm failed to give all teams minimum ${targetGames} games. Check console for details.`)
+
+      if (!result.ok) {
+        alert(`Error: ${result.error}`)
         return
       }
-      
-      // Show distribution summary
-      const gameDistribution = teams.reduce((acc, t) => {
-        const count = finalGameCounts[t.name]
-        acc[count] = (acc[count] || 0) + 1
-        return acc
-      }, {} as Record<number, number>)
-      
-      console.log(`📊 Game distribution:`, Object.entries(gameDistribution).map(([games, teams]) => 
-        `${teams} team${teams === 1 ? '' : 's'} with ${games} game${games === '1' ? '' : 's'}`
-      ).join(', '))
-      
-      // Show schedule preview
-      scheduledMatches.slice(0, 10).forEach((match, i) => {
-      })
-      if (scheduledMatches.length > 10) {
-      }
-      
-      if (scheduledMatches.length > 0) {
-        await createMatches(scheduledMatches)
+
+      if (result.matches.length > 0) {
+        await createMatches(result.matches)
       } else {
+        alert("All teams already have enough games — nothing new to generate.")
       }
     } catch (error) {
       console.error("Error generating matches:", error)
@@ -426,7 +72,7 @@ export default function PoolPlay({
   const generateKnockoutBracket = async () => {
     if (!requireAdmin("generate the knockout bracket")) return
 
-    const standings = calculateStandings()
+    const standings = calculateStandings(teams, matches)
     const completedMatches = matches.filter((match) => match.completed)
     
     if (completedMatches.length === 0) {
@@ -611,6 +257,8 @@ export default function PoolPlay({
     setTeam2Score("")
   }
 
+  const sanitizeScoreInput = (raw: string) => raw.replace(/[^\d]/g, "").slice(0, 3)
+
   const setQuickScore = async (matchId: number, team1Score: number, team2Score: number) => {
     if (!requireAdmin("edit match scores")) return
     try {
@@ -717,7 +365,7 @@ export default function PoolPlay({
     }
   }
 
-  const standings = calculateStandings()
+  const standings = calculateStandings(teams, matches)
   const completedMatches = matches.filter((match) => match.completed).length
   const totalMatches = matches.length
   const progressPercentage = totalMatches > 0 ? (completedMatches / totalMatches) * 100 : 0
@@ -1038,19 +686,24 @@ export default function PoolPlay({
 
                             <div className="flex flex-col items-center gap-2">
                               <Input
-                                type="number"
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                enterKeyHint="done"
+                                autoComplete="off"
                                 value={team1Score}
-                                onChange={(e) => setTeam1Score(e.target.value)}
+                                onChange={(e) => setTeam1Score(sanitizeScoreInput(e.target.value))}
+                                onFocus={(e) => e.target.select()}
                                 placeholder="0"
-                                className="w-20 h-16 text-center text-3xl font-bold border-2 border-red-300 rounded-lg"
-                                min="0"
+                                className="w-24 min-h-[3.5rem] text-center text-3xl font-bold border-2 border-red-300 rounded-lg touch-target"
+                                aria-label={`${match.team1.name} score`}
                               />
                               <Button
                                 onClick={() => {
                                   setTeam1Score("21")
                                   setTeam2Score("0")
                                 }}
-                                className="bg-red-600 hover:bg-red-700 text-white font-bold px-4 py-2 text-sm rounded-full"
+                                className="bg-red-600 hover:bg-red-700 text-white font-bold px-4 py-2 text-sm rounded-full min-h-11"
                                 size="sm"
                               >
                                 🏆 Win
@@ -1101,19 +754,24 @@ export default function PoolPlay({
 
                             <div className="flex flex-col items-center gap-2">
                               <Input
-                                type="number"
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                enterKeyHint="done"
+                                autoComplete="off"
                                 value={team2Score}
-                                onChange={(e) => setTeam2Score(e.target.value)}
+                                onChange={(e) => setTeam2Score(sanitizeScoreInput(e.target.value))}
+                                onFocus={(e) => e.target.select()}
                                 placeholder="0"
-                                className="w-20 h-16 text-center text-3xl font-bold border-2 border-blue-300 rounded-lg"
-                                min="0"
+                                className="w-24 min-h-[3.5rem] text-center text-3xl font-bold border-2 border-blue-300 rounded-lg touch-target"
+                                aria-label={`${match.team2.name} score`}
                               />
                               <Button
                                 onClick={() => {
                                   setTeam2Score("21")
                                   setTeam1Score("0")
                                 }}
-                                className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2 text-sm rounded-full"
+                                className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2 text-sm rounded-full min-h-11"
                                 size="sm"
                               >
                                 🏆 Win

@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Trophy } from "lucide-react"
 import type { Team, Match } from "@/types/tournament"
+import { calculateStandings } from "@/lib/pool-play"
 
 interface StandingsProps {
   teams: Team[]
@@ -13,50 +14,6 @@ interface StandingsProps {
 }
 
 export default function Standings({ teams, matches, showTitle = true }: StandingsProps) {
-  // Calculate team standings
-  const calculateStandings = () => {
-    const standings = teams.map((team) => {
-      const teamMatches = matches.filter(
-        (match) => (match.team1.id === team.id || match.team2.id === team.id) && match.completed,
-      )
-
-      let wins = 0
-      let losses = 0
-      let pointsFor = 0
-      let pointsAgainst = 0
-
-      teamMatches.forEach((match) => {
-        if (match.team1.id === team.id) {
-          pointsFor += match.team1Score
-          pointsAgainst += match.team2Score
-          if (match.team1Score > match.team2Score) wins++
-          else losses++
-        } else {
-          pointsFor += match.team2Score
-          pointsAgainst += match.team1Score
-          if (match.team2Score > match.team1Score) wins++
-          else losses++
-        }
-      })
-
-      return {
-        ...team,
-        wins,
-        losses,
-        pointsFor,
-        pointsAgainst,
-        pointDifferential: pointsFor - pointsAgainst,
-        gamesPlayed: teamMatches.length,
-      }
-    })
-
-    // Sort by wins (desc), then point differential (desc)
-    return standings.sort((a, b) => {
-      if (a.wins !== b.wins) return b.wins - a.wins
-      return b.pointDifferential - a.pointDifferential
-    })
-  }
-
   const getPositionIcon = (position: number, totalTeams: number) => {
     if (position === 1) return "🔥"
     if (position === 2) return "💪"
@@ -73,7 +30,7 @@ export default function Standings({ teams, matches, showTitle = true }: Standing
     return { text: `${position}th Place`, color: "bg-blue-500 text-white" }
   }
 
-  const standings = calculateStandings()
+  const standings = calculateStandings(teams, matches)
   const completedMatches = matches.filter((match) => match.completed).length
   const totalMatches = matches.length
 
